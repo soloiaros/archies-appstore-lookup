@@ -4,15 +4,22 @@ import type { DiscoveryHit } from "@/lib/types";
 
 import type { ProvenanceTier } from "@/models/provenance";
 
-// TODO(phase-7)
-
 export function DiscoveryList({
   hits,
   tier,
+  scoring,
+  scoringNote,
+  finalistCount,
 }: {
   hits: DiscoveryHit[];
 
   tier: ProvenanceTier;
+
+  scoring: "scored" | "unavailable";
+
+  scoringNote: string | null;
+
+  finalistCount: number;
 }) {
   return (
     <section data-shape="discovery">
@@ -22,9 +29,25 @@ export function DiscoveryList({
         <ProvenanceMark tier={tier} />
       </h2>
 
-      {hits.length === 0 ? (
-        <p>No finalists.</p>
-      ) : (
+      {scoring === "unavailable" ? (
+        <p>
+          {scoringNote
+            ?? "Scoring needs TYPE_SAFE_KEY."}
+          {" "}
+          Retrieved
+          {" "}
+          {finalistCount}
+          {" "}
+          finalists without scores.
+        </p>
+      ) : null}
+
+      {scoring === "scored"
+      && hits.length === 0 ? (
+        <p>No apps cleared the certainty threshold.</p>
+      ) : null}
+
+      {hits.length > 0 ? (
         <ol>
           {hits.map((hit) => (
             <li key={hit.trackId}>
@@ -38,7 +61,7 @@ export function DiscoveryList({
             </li>
           ))}
         </ol>
-      )}
+      ) : null}
     </section>
   );
 }

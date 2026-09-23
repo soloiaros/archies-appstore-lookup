@@ -92,6 +92,9 @@ export function QueryScreen() {
         <DiscoveryList
           hits={state.answer.hits}
           tier={state.answer.tier}
+          scoring={state.answer.scoring}
+          scoringNote={state.answer.scoringNote}
+          finalistCount={state.answer.finalistCount}
         />
       ) : null}
     </section>
