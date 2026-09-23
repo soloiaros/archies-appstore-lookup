@@ -38,6 +38,10 @@ export function openCatalog(): DatabaseSync {
   );
 
   db.exec(
+    "pragma journal_mode = WAL",
+  );
+
+  db.exec(
     readFileSync(
       join(
         process.cwd(),
@@ -295,6 +299,285 @@ export function upsertObserved(
         release.version,
         release.releasedAt,
         release.notes,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export function replaceAppTags(
+  db: DatabaseSync,
+  rows: Array<{
+    trackId: number;
+
+    tagId: string;
+
+    method: string;
+  }>,
+): void {
+  const remove = db.prepare(
+    "delete from app_tags where track_id = ?",
+  );
+
+  const insert = db.prepare(`
+    insert into app_tags (
+      track_id,
+      tag_id,
+      tier,
+      method
+    ) values (
+      ?, ?, 'estimated', ?
+    )
+  `);
+
+  const trackIds = [
+    ...new Set(
+      rows.map((row) => row.trackId),
+    ),
+  ];
+
+  db.exec("begin");
+
+  try {
+    for (const trackId of trackIds) {
+      remove.run(trackId);
+    }
+
+    for (const row of rows) {
+      insert.run(
+        row.trackId,
+        row.tagId,
+        row.method,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export type EmbeddingRow = {
+  trackId: number;
+
+  method: string;
+
+  model: string;
+
+  sourceHash: string;
+
+  dims: number;
+
+  vector: Uint8Array;
+
+  embeddedAt: string;
+};
+
+export type StoredHash = {
+  trackId: number;
+
+  sourceHash: string;
+};
+
+export function listTextHashes(
+  db: DatabaseSync,
+): Map<number, string> {
+  const rows = db.prepare(`
+    select
+      track_id as trackId,
+      source_hash as sourceHash
+    from text_embeddings
+  `).all() as StoredHash[];
+
+  return new Map(
+    rows.map((row) => [
+      row.trackId,
+      row.sourceHash,
+    ]),
+  );
+}
+
+export function listIconHashes(
+  db: DatabaseSync,
+): Map<number, string> {
+  const rows = db.prepare(`
+    select
+      track_id as trackId,
+      source_hash as sourceHash
+    from icon_embeddings
+  `).all() as StoredHash[];
+
+  return new Map(
+    rows.map((row) => [
+      row.trackId,
+      row.sourceHash,
+    ]),
+  );
+}
+
+export function upsertTextEmbeddings(
+  db: DatabaseSync,
+  rows: EmbeddingRow[],
+): void {
+  const write = db.prepare(`
+    insert into text_embeddings (
+      track_id,
+      tier,
+      method,
+      model,
+      source_hash,
+      dims,
+      vector,
+      embedded_at
+    ) values (
+      ?, 'estimated', ?, ?, ?, ?, ?, ?
+    )
+    on conflict (track_id) do update set
+      method = excluded.method,
+      model = excluded.model,
+      source_hash = excluded.source_hash,
+      dims = excluded.dims,
+      vector = excluded.vector,
+      embedded_at = excluded.embedded_at
+    where
+      text_embeddings.source_hash is not excluded.source_hash
+  `);
+
+  db.exec("begin");
+
+  try {
+    for (const row of rows) {
+      write.run(
+        row.trackId,
+        row.method,
+        row.model,
+        row.sourceHash,
+        row.dims,
+        row.vector as unknown as string,
+        row.embeddedAt,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export function upsertIconEmbeddings(
+  db: DatabaseSync,
+  rows: EmbeddingRow[],
+): void {
+  const write = db.prepare(`
+    insert into icon_embeddings (
+      track_id,
+      tier,
+      method,
+      model,
+      source_hash,
+      dims,
+      vector,
+      embedded_at
+    ) values (
+      ?, 'estimated', ?, ?, ?, ?, ?, ?
+    )
+    on conflict (track_id) do update set
+      method = excluded.method,
+      model = excluded.model,
+      source_hash = excluded.source_hash,
+      dims = excluded.dims,
+      vector = excluded.vector,
+      embedded_at = excluded.embedded_at
+    where
+      icon_embeddings.source_hash is not excluded.source_hash
+  `);
+
+  db.exec("begin");
+
+  try {
+    for (const row of rows) {
+      write.run(
+        row.trackId,
+        row.method,
+        row.model,
+        row.sourceHash,
+        row.dims,
+        row.vector as unknown as string,
+        row.embeddedAt,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export function dropAppTag(
+  db: DatabaseSync,
+  trackId: number,
+  tagId: string,
+): void {
+  db.prepare(`
+    delete from app_tags
+    where track_id = ?
+      and tag_id = ?
+  `).run(
+    trackId,
+    tagId,
+  );
+}
+
+export function replaceScreenshotOcr(
+  db: DatabaseSync,
+  rows: Array<{
+    trackId: number;
+
+    screenshotUrl: string;
+
+    method: string;
+
+    text: string;
+  }>,
+): void {
+  const write = db.prepare(`
+    insert into screenshot_ocr (
+      track_id,
+      screenshot_url,
+      tier,
+      method,
+      text
+    ) values (
+      ?, ?, 'estimated', ?, ?
+    )
+    on conflict (track_id, screenshot_url) do update set
+      method = excluded.method,
+      text = excluded.text
+    where
+      screenshot_ocr.text is not excluded.text
+      or screenshot_ocr.method is not excluded.method
+  `);
+
+  db.exec("begin");
+
+  try {
+    for (const row of rows) {
+      write.run(
+        row.trackId,
+        row.screenshotUrl,
+        row.method,
+        row.text,
       );
     }
 
