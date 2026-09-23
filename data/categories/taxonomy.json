@@ -1,0 +1,35 @@
+{
+  "chartLimit": 100,
+  "charts": [
+    "top-free",
+    "top-paid",
+    "top-grossing"
+  ],
+  "genres": [
+    { "id": 6000, "name": "Business" },
+    { "id": 6001, "name": "Weather" },
+    { "id": 6002, "name": "Utilities" },
+    { "id": 6003, "name": "Travel" },
+    { "id": 6004, "name": "Sports" },
+    { "id": 6005, "name": "Social Networking" },
+    { "id": 6006, "name": "Reference" },
+    { "id": 6007, "name": "Productivity" },
+    { "id": 6008, "name": "Photo & Video" },
+    { "id": 6009, "name": "News" },
+    { "id": 6010, "name": "Navigation" },
+    { "id": 6011, "name": "Music" },
+    { "id": 6012, "name": "Lifestyle" },
+    { "id": 6013, "name": "Health & Fitness" },
+    { "id": 6014, "name": "Games" },
+    { "id": 6015, "name": "Finance" },
+    { "id": 6016, "name": "Entertainment" },
+    { "id": 6017, "name": "Education" },
+    { "id": 6018, "name": "Books" },
+    { "id": 6020, "name": "Medical" },
+    { "id": 6021, "name": "Magazines & Newspapers" },
+    { "id": 6023, "name": "Food & Drink" },
+    { "id": 6024, "name": "Shopping" },
+    { "id": 6026, "name": "Developer Tools" },
+    { "id": 6027, "name": "Graphics & Design" }
+  ]
+}
