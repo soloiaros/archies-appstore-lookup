@@ -13,12 +13,20 @@
     "scrape:seed": "tsx scripts/scrape-seed.ts",
     "poll:momentum": "tsx scripts/poll-momentum.ts",
     "tag:pass": "tsx scripts/tag-pass.ts",
-    "embed:pass": "tsx scripts/embed-pass.ts"
+    "embed:pass": "tsx scripts/embed-pass.ts",
+    "embed:probe": "tsx scripts/probe-embeddings.ts",
+    "ocr:probe": "tsx scripts/probe-ocr.ts",
+    "validate:index": "tsx scripts/validate-index.ts",
+    "test:jev": "tsx scripts/test-jev-mock.ts",
+    "test:staleness": "tsx scripts/test-staleness.ts",
+    "exercise:query": "tsx scripts/exercise-query.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
     "next": "^16.3.6",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
