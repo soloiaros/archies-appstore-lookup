@@ -1,0 +1,98 @@
+:root {
+  color: #111;
+  background: #fff;
+  font: 16px/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem;
+}
+
+h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+label {
+  width: 100%;
+}
+
+input,
+button {
+  font: inherit;
+}
+
+input {
+  flex: 1;
+  min-width: 12rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #ccc;
+  background: #fff;
+  color: #111;
+}
+
+button {
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #111;
+  background: #111;
+  color: #fff;
+}
+
+.tier {
+  display: inline-block;
+  padding: 0 0.35rem;
+  border: 1px solid #111;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tier-estimated {
+  border-style: dashed;
+}
+
+.tier-unavailable {
+  color: #666;
+  border-color: #999;
+}
+
+article,
+section {
+  margin-top: 0.5rem;
+}
+
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+li {
+  padding: 0.75rem 0;
+  border-top: 1px solid #ddd;
+}
+
+p {
+  margin: 0.4rem 0;
+}
