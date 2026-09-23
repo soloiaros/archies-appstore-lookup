@@ -1,0 +1,44 @@
+{
+  "queries": [
+    {
+      "text": "minimalist habit tracker",
+      "shape": "discovery"
+    },
+    {
+      "text": "dark mode note app",
+      "shape": "discovery"
+    },
+    {
+      "text": "envelope budget planner",
+      "shape": "discovery"
+    },
+    {
+      "text": "live flight tracker",
+      "shape": "discovery"
+    },
+    {
+      "text": "chromatic guitar tuner",
+      "shape": "discovery"
+    },
+    {
+      "text": "baby first foods",
+      "shape": "discovery"
+    },
+    {
+      "text": "offline bible reading",
+      "shape": "discovery"
+    },
+    {
+      "text": "ssh client for a phone",
+      "shape": "discovery"
+    },
+    {
+      "text": "period and cycle tracker",
+      "shape": "discovery"
+    },
+    {
+      "text": "hunting trail maps",
+      "shape": "discovery"
+    }
+  ]
+}

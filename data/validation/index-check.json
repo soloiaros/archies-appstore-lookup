@@ -1,0 +1,415 @@
+{
+  "checkedAt": "2026-09-23T20:06:05.227Z",
+  "counts": {
+    "textEmbeddings": 6417,
+    "iconEmbeddings": 6417,
+    "apps": 6417
+  },
+  "discovery": [
+    {
+      "query": "minimalist habit tracker",
+      "top": [
+        {
+          "trackId": 6813237727,
+          "name": "Did I Do It? Habit Tracker",
+          "score": 0.8027
+        },
+        {
+          "trackId": 963034692,
+          "name": "Streaks",
+          "score": 0.7482
+        },
+        {
+          "trackId": 6743134010,
+          "name": "dots: days left widget",
+          "score": 0.7408
+        },
+        {
+          "trackId": 1037595083,
+          "name": "StepsApp Pedometer",
+          "score": 0.7259
+        },
+        {
+          "trackId": 6756283371,
+          "name": "One Hour: Hourly Reminders",
+          "score": 0.7251
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "dark mode note app",
+      "top": [
+        {
+          "trackId": 1438243180,
+          "name": "Dark Reader for Safari",
+          "score": 0.7962
+        },
+        {
+          "trackId": 6758548229,
+          "name": "DarkMode | Web",
+          "score": 0.7346
+        },
+        {
+          "trackId": 1483790257,
+          "name": "Text Editor.",
+          "score": 0.7331
+        },
+        {
+          "trackId": 1516174326,
+          "name": "RSSolved",
+          "score": 0.7247
+        },
+        {
+          "trackId": 1581140954,
+          "name": "Noir - Dark Mode for Safari",
+          "score": 0.7061
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "envelope budget planner",
+      "top": [
+        {
+          "trackId": 918609651,
+          "name": "Money Pro: Personal Finance AR",
+          "score": 0.6995
+        },
+        {
+          "trackId": 1621020173,
+          "name": "Fleur - Budget Planner App",
+          "score": 0.6992
+        },
+        {
+          "trackId": 1525179720,
+          "name": "Budget app - spending tracker",
+          "score": 0.699
+        },
+        {
+          "trackId": 471112395,
+          "name": "Goodbudget Budget Planner",
+          "score": 0.6964
+        },
+        {
+          "trackId": 942571931,
+          "name": "EveryDollar: Budget Management",
+          "score": 0.6858
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "live flight tracker",
+      "top": [
+        {
+          "trackId": 6608970045,
+          "name": "Flight Tracker: Plane Radar 24",
+          "score": 0.859
+        },
+        {
+          "trackId": 525956148,
+          "name": "Flight Tracker Pro Plane Radar",
+          "score": 0.8408
+        },
+        {
+          "trackId": 382233851,
+          "name": "Flightradar24 | Flight Tracker",
+          "score": 0.8382
+        },
+        {
+          "trackId": 1097815000,
+          "name": "Planes Live - Flight Tracker",
+          "score": 0.8367
+        },
+        {
+          "trackId": 6753592996,
+          "name": "FlightSky: Live Plane Radar",
+          "score": 0.8344
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "chromatic guitar tuner",
+      "top": [
+        {
+          "trackId": 1107017950,
+          "name": "Fender Tune: Guitar Tuner App",
+          "score": 0.7678
+        },
+        {
+          "trackId": 528923171,
+          "name": "insTuner - Chromatic Tuner with Tone Generator",
+          "score": 0.7664
+        },
+        {
+          "trackId": 1438248122,
+          "name": "Tuner Pro: Guitar Tuner & Tab",
+          "score": 0.7653
+        },
+        {
+          "trackId": 954982733,
+          "name": "Tuner T1 Pro",
+          "score": 0.7497
+        },
+        {
+          "trackId": 1573260863,
+          "name": "Guitar Tuner - Simply Tune",
+          "score": 0.746
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "baby first foods",
+      "top": [
+        {
+          "trackId": 1564189151,
+          "name": "Solid Starts: Baby First Foods",
+          "score": 0.7998
+        },
+        {
+          "trackId": 6744701507,
+          "name": "BabyPlate: Starting Solids",
+          "score": 0.7906
+        },
+        {
+          "trackId": 6477230784,
+          "name": "101 before one",
+          "score": 0.7698
+        },
+        {
+          "trackId": 409157308,
+          "name": "Annabel Karmel Kids Recipes",
+          "score": 0.7685
+        },
+        {
+          "trackId": 1540196240,
+          "name": "BLW Meals: Starting Solids",
+          "score": 0.7397
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "offline bible reading",
+      "top": [
+        {
+          "trackId": 6447543328,
+          "name": "KJV Bible Now: Read & Study",
+          "score": 0.8218
+        },
+        {
+          "trackId": 1090228108,
+          "name": "Bible Hub",
+          "score": 0.8151
+        },
+        {
+          "trackId": 6737805080,
+          "name": "You Version Bible App",
+          "score": 0.8144
+        },
+        {
+          "trackId": 1472850697,
+          "name": "Bible Offline - KJV Holy Bible",
+          "score": 0.8133
+        },
+        {
+          "trackId": 6770676343,
+          "name": "Verse Bible",
+          "score": 0.7999
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "ssh client for a phone",
+      "top": [
+        {
+          "trackId": 1475741280,
+          "name": "SSH Client - Terminal & Termux",
+          "score": 0.8164
+        },
+        {
+          "trackId": 6755708389,
+          "name": "Termiux",
+          "score": 0.7318
+        },
+        {
+          "trackId": 6743685377,
+          "name": "Termix Pro: SSH & SFTP Client",
+          "score": 0.7133
+        },
+        {
+          "trackId": 1260223542,
+          "name": "SSH Tunnel: VPN & SOCKS5 proxy",
+          "score": 0.7102
+        },
+        {
+          "trackId": 6742807404,
+          "name": "Easy SSH",
+          "score": 0.6995
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "period and cycle tracker",
+      "top": [
+        {
+          "trackId": 896501514,
+          "name": "Period Tracker Period Calendar",
+          "score": 0.8184
+        },
+        {
+          "trackId": 657189652,
+          "name": "Clue Period & Cycle Tracker",
+          "score": 0.7934
+        },
+        {
+          "trackId": 1495829322,
+          "name": "Stardust Period Tracker",
+          "score": 0.7854
+        },
+        {
+          "trackId": 765535549,
+          "name": "Natural Cycles: Fertility App",
+          "score": 0.7705
+        },
+        {
+          "trackId": 1038369065,
+          "name": "Flo Cycle & Period Tracker",
+          "score": 0.7552
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "hunting trail maps",
+      "top": [
+        {
+          "trackId": 1500630352,
+          "name": "GOHUNT: Research & Maps",
+          "score": 0.8028
+        },
+        {
+          "trackId": 1305237481,
+          "name": "BaseMap: 3D Hunting Maps & GPS",
+          "score": 0.7846
+        },
+        {
+          "trackId": 1345594447,
+          "name": "Hunting Points: GPS & Hunt App",
+          "score": 0.7793
+        },
+        {
+          "trackId": 778772892,
+          "name": "HuntStand: GPS Maps & Tools",
+          "score": 0.7784
+        },
+        {
+          "trackId": 6741421159,
+          "name": "Detector Maps",
+          "score": 0.7448
+        }
+      ],
+      "plausible": true
+    }
+  ],
+  "icons": [
+    {
+      "query": "simple blue square icon",
+      "top": [
+        {
+          "trackId": 1512938504,
+          "name": "Code App",
+          "score": 0.3466
+        },
+        {
+          "trackId": 719171358,
+          "name": "Intune Company Portal",
+          "score": 0.3462
+        },
+        {
+          "trackId": 1439623630,
+          "name": "sendit - get it now",
+          "score": 0.3407
+        },
+        {
+          "trackId": 1589618453,
+          "name": "Walletsmith: Wallet Pass Maker",
+          "score": 0.339
+        },
+        {
+          "trackId": 1565576987,
+          "name": "Bilt Rewards",
+          "score": 0.3387
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "green owl mascot icon",
+      "top": [
+        {
+          "trackId": 284876795,
+          "name": "Tripadvisor: Plan & Book Trips",
+          "score": 0.394
+        },
+        {
+          "trackId": 1397382074,
+          "name": "NightOwl Companion",
+          "score": 0.3672
+        },
+        {
+          "trackId": 6479742882,
+          "name": "Seeing",
+          "score": 0.3669
+        },
+        {
+          "trackId": 1564333761,
+          "name": "BudWatcher",
+          "score": 0.3649
+        },
+        {
+          "trackId": 570060128,
+          "name": "Duolingo: Language Lessons",
+          "score": 0.3585
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "yellow bird logo",
+      "top": [
+        {
+          "trackId": 1634119476,
+          "name": "Parental Control BrightCanary",
+          "score": 0.337
+        },
+        {
+          "trackId": 773457673,
+          "name": "Merlin Bird ID by Cornell Lab",
+          "score": 0.3329
+        },
+        {
+          "trackId": 6670330506,
+          "name": "Libre by Abbott",
+          "score": 0.3205
+        },
+        {
+          "trackId": 474500851,
+          "name": "Yandex Navi – navigation, maps",
+          "score": 0.3198
+        },
+        {
+          "trackId": 555643284,
+          "name": "iKitesurf: Weather & Waves",
+          "score": 0.3174
+        }
+      ],
+      "plausible": true
+    }
+  ]
+}
