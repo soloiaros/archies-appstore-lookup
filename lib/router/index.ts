@@ -1,4 +1,6 @@
-import { emptyCatalog } from "@/lib/catalog";
+import { loadLocalEnv } from "@/lib/env";
+
+import { sqliteCatalog } from "@/lib/catalog/sqlite";
 
 import { answerComparative } from "@/lib/router/comparative";
 
@@ -10,31 +12,37 @@ import { classify } from "@/lib/router/classify";
 
 import type { QueryAnswer } from "@/lib/types";
 
+loadLocalEnv();
+
 export async function answer(
   query: string,
 ): Promise<QueryAnswer> {
   const shape = classify(query);
 
-  const catalog = emptyCatalog();
+  const catalog = sqliteCatalog();
 
-  if (shape === "factual") {
-    return answerFactual(
+  try {
+    if (shape === "factual") {
+      return await answerFactual(
+        query,
+        catalog,
+      );
+    }
+
+    if (shape === "comparative") {
+      return await answerComparative(
+        query,
+        catalog,
+      );
+    }
+
+    return await answerDiscovery(
       query,
       catalog,
     );
+  } finally {
+    catalog.close();
   }
-
-  if (shape === "comparative") {
-    return answerComparative(
-      query,
-      catalog,
-    );
-  }
-
-  return answerDiscovery(
-    query,
-    catalog,
-  );
 }
 
 export { classify } from "@/lib/router/classify";

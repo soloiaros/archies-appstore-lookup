@@ -1,7 +1,7 @@
 import type {
   Catalog,
   RankedApp,
-} from "@/lib/catalog";
+} from "@/lib/catalog/types";
 
 import type { Reading } from "@/models/provenance";
 
@@ -35,10 +35,14 @@ export async function answerComparative(
     await catalog.ranked(),
   );
 
+  const anyMomentum = ranked.some(
+    (row) => row.momentum.tier === "estimated",
+  );
+
   return {
     shape: "comparative",
     query,
-    tier: ranked.length
+    tier: anyMomentum
       ? "estimated"
       : "unavailable",
     rows: ranked.map((row) => ({

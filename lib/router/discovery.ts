@@ -1,6 +1,9 @@
-import type { Catalog } from "@/lib/catalog";
+import type { Catalog } from "@/lib/catalog/types";
 
-import { scoreFinalists } from "@/lib/jev/score";
+import {
+  aboveThreshold,
+  scoreFinalists,
+} from "@/lib/jev/score";
 
 import type { DiscoveryAnswer } from "@/lib/types";
 
@@ -12,9 +15,27 @@ export async function answerDiscovery(
     query,
   );
 
-  const scores = await scoreFinalists(
+  const scored = await scoreFinalists(
     query,
     finalists,
+  );
+
+  if (scored.status === "unavailable") {
+    return {
+      shape: "discovery",
+      query,
+      tier: "unavailable",
+      scoring: "unavailable",
+      scoringNote:
+        scored.reason
+        ?? "Scoring needs TYPE_SAFE_KEY.",
+      finalistCount: finalists.length,
+      hits: [],
+    };
+  }
+
+  const kept = aboveThreshold(
+    scored.scores,
   );
 
   const byId = new Map(
@@ -24,7 +45,7 @@ export async function answerDiscovery(
     ]),
   );
 
-  const hits = scores.flatMap((score) => {
+  const hits = kept.flatMap((score) => {
     const finalist = byId.get(score.trackId);
 
     if (!finalist) {
@@ -45,8 +66,11 @@ export async function answerDiscovery(
     shape: "discovery",
     query,
     tier: hits.length
-      ? "verified"
+      ? "estimated"
       : "unavailable",
+    scoring: "scored",
+    scoringNote: null,
+    finalistCount: finalists.length,
     hits,
   };
 }

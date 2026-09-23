@@ -94,6 +94,12 @@ export type DiscoveryAnswer = {
 
   tier: ProvenanceTier;
 
+  scoring: "scored" | "unavailable";
+
+  scoringNote: string | null;
+
+  finalistCount: number;
+
   hits: DiscoveryHit[];
 };
 
