@@ -1,11 +1,19 @@
-import type { AppTag } from "@/models/signals";
+export const TAG_PASS_LIMIT = 50;
 
 export async function tagApps(
   trackIds: number[],
-): Promise<AppTag[]> {
-  // TODO(phase-3)
+): Promise<never> {
+  const ids = [
+    ...new Set(trackIds),
+  ];
 
-  void trackIds;
+  if (ids.length !== TAG_PASS_LIMIT) {
+    throw new Error(
+      `tag pass refused: ${ids.length} ids`,
+    );
+  }
 
-  return [];
+  throw new Error(
+    "tags assigned offline, not via API",
+  );
 }
