@@ -1,0 +1,6 @@
+PATH=/opt/homebrew/opt/node@24/bin:/usr/bin:/bin
+SHELL=/bin/zsh
+
+# 06:15 local. Same poll as .github/workflows/daily.yml.
+# scrape-seed and poll-momentum both call refreshCatalog.
+15 6 * * * cd "/Users/yaroslavsolovev/Documents/Projects/AppStore Indexor" && npm run poll:momentum >> "/Users/yaroslavsolovev/Documents/Projects/AppStore Indexor/data/snapshots/poll-cron.log" 2>&1
