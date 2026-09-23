@@ -1,4 +1,14 @@
+import { readLookupResults } from "@/lib/scrape/map";
+
+import { getJson } from "@/lib/scrape/http";
+
+import { sleep } from "@/lib/scrape/retry";
+
+import { dedupTrackIds } from "@/lib/scrape/dedup";
+
 export const LOOKUP_BATCH_SIZE = 200;
+
+export const LOOKUP_GAP_MS = 500;
 
 export type LookupResult = {
   trackId: number;
@@ -91,11 +101,52 @@ export async function lookupBatch(
   trackIds: number[],
   country: string,
 ): Promise<LookupResult[]> {
-  // TODO(phase-1)
+  if (trackIds.length === 0) {
+    return [];
+  }
 
-  void trackIds;
+  if (trackIds.length > LOOKUP_BATCH_SIZE) {
+    throw new Error(
+      "Lookup batches stay at or under 200 ids.",
+    );
+  }
 
-  void country;
+  const payload = await getJson(
+    lookupUrl(
+      trackIds,
+      country,
+    ),
+  );
 
-  return [];
+  return readLookupResults(payload);
+}
+
+export async function lookupAll(
+  trackIds: number[],
+  country: string,
+): Promise<LookupResult[]> {
+  const chunks = chunkTrackIds(
+    dedupTrackIds(trackIds),
+  );
+
+  const apps: LookupResult[] = [];
+
+  for (
+    let index = 0;
+    index < chunks.length;
+    index += 1
+  ) {
+    const batch = await lookupBatch(
+      chunks[index],
+      country,
+    );
+
+    apps.push(...batch);
+
+    if (index < chunks.length - 1) {
+      await sleep(LOOKUP_GAP_MS);
+    }
+  }
+
+  return apps;
 }

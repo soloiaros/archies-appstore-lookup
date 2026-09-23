@@ -21,6 +21,7 @@ Marketing Tools v2 serves overall charts only:
 `https://rss.applemarketingtools.com/api/v2/{country}/apps/{top-free|top-paid|top-grossing}/{limit}/apps.json`
 
 `limit` above 100 returns an error. A category path on this host returns 404.
+Overall top-grossing on this host also returns 404. That chart uses the legacy feed with no `genre` parameter.
 
 Per-category charts use the legacy iTunes RSS feed, capped at 100 results:
 

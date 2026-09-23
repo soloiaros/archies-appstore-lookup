@@ -31,3 +31,5 @@ next-env.d.ts
 
 /data/snapshots/*
 !/data/snapshots/.gitkeep
+/data/catalog.sqlite
+/data/catalog.sqlite-*

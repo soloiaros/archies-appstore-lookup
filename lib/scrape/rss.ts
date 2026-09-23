@@ -1,5 +1,7 @@
 import type { ChartKind } from "@/models/series";
 
+import { getJson } from "@/lib/scrape/http";
+
 import {
   asNumber,
   isRecord,
@@ -12,6 +14,10 @@ const LEGACY_CHARTS: Record<ChartKind, string> = {
   "top-paid": "toppaidapplications",
   "top-grossing": "topgrossingapplications",
 };
+
+export type ChartSource =
+  | "marketing"
+  | "legacy";
 
 export type ChartHit = {
   trackId: number;
@@ -36,17 +42,25 @@ export function marketingFeedUrl(
 export function categoryFeedUrl(
   country: string,
   chart: ChartKind,
-  genreId: number,
+  genreId: number | null,
 ): string {
-  return [
+  const parts = [
     "https://itunes.apple.com",
     country,
     "rss",
     LEGACY_CHARTS[chart],
     `limit=${CHART_LIMIT}`,
-    `genre=${genreId}`,
-    "json",
-  ].join("/");
+  ];
+
+  if (genreId !== null) {
+    parts.push(
+      `genre=${genreId}`,
+    );
+  }
+
+  parts.push("json");
+
+  return parts.join("/");
 }
 
 export function trackIdsFromMarketing(
@@ -144,10 +158,13 @@ export function trackIdsFromLegacy(
 
 export async function fetchChart(
   url: string,
+  source: ChartSource,
 ): Promise<ChartHit[]> {
-  // TODO(phase-1)
+  const payload = await getJson(url);
 
-  void url;
+  if (source === "marketing") {
+    return trackIdsFromMarketing(payload);
+  }
 
-  return [];
+  return trackIdsFromLegacy(payload);
 }

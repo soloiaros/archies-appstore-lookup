@@ -9,8 +9,22 @@ export {
 } from "@/lib/scrape/delist";
 
 export {
+  aggregateCharts,
+  chartFeedJobs,
+  CHART_GAP_MS,
+} from "@/lib/scrape/aggregate";
+
+export type {
+  ChartAppearance,
+  ChartCollection,
+  FeedReport,
+} from "@/lib/scrape/aggregate";
+
+export {
   chunkTrackIds,
   LOOKUP_BATCH_SIZE,
+  LOOKUP_GAP_MS,
+  lookupAll,
   lookupBatch,
   lookupUrl,
 } from "@/lib/scrape/lookup";
@@ -24,7 +38,10 @@ export {
   toVersionRelease,
 } from "@/lib/scrape/map";
 
-export { withLookupRetry } from "@/lib/scrape/retry";
+export {
+  sleep,
+  withHttpRetry,
+} from "@/lib/scrape/retry";
 
 export {
   categoryFeedUrl,
@@ -35,11 +52,16 @@ export {
   trackIdsFromMarketing,
 } from "@/lib/scrape/rss";
 
-export type { ChartHit } from "@/lib/scrape/rss";
+export type {
+  ChartHit,
+  ChartSource,
+} from "@/lib/scrape/rss";
 
 export {
-  insertCharts,
-  insertRatings,
-  insertVersions,
-  upsertApps,
-} from "@/lib/scrape/upsert";
+  catalogCounts,
+  listTrackIds,
+  openCatalog,
+  upsertObserved,
+} from "@/lib/scrape/store";
+
+export type { CatalogCounts } from "@/lib/scrape/store";
