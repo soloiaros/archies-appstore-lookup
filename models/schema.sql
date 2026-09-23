@@ -71,3 +71,50 @@ create table if not exists version_releases (
   notes text not null,
   primary key (track_id, version)
 );
+
+create table if not exists app_tags (
+  track_id integer not null references apps (track_id),
+  tag_id text not null,
+  tier text not null default 'estimated' check (
+    tier in ('verified', 'estimated', 'unavailable')
+  ),
+  method text not null,
+  primary key (track_id, tag_id)
+);
+
+create table if not exists screenshot_ocr (
+  track_id integer not null references apps (track_id),
+  screenshot_url text not null,
+  tier text not null default 'estimated' check (
+    tier in ('verified', 'estimated', 'unavailable')
+  ),
+  method text not null,
+  text text not null,
+  primary key (track_id, screenshot_url)
+);
+
+create table if not exists text_embeddings (
+  track_id integer primary key references apps (track_id),
+  tier text not null default 'estimated' check (
+    tier in ('verified', 'estimated', 'unavailable')
+  ),
+  method text not null,
+  model text not null,
+  source_hash text not null,
+  dims integer not null,
+  vector blob not null,
+  embedded_at text not null
+);
+
+create table if not exists icon_embeddings (
+  track_id integer primary key references apps (track_id),
+  tier text not null default 'estimated' check (
+    tier in ('verified', 'estimated', 'unavailable')
+  ),
+  method text not null,
+  model text not null,
+  source_hash text not null,
+  dims integer not null,
+  vector blob not null,
+  embedded_at text not null
+);
