@@ -527,6 +527,10 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
     window.addEventListener("resize", onResize);
     // The wheel scrolls the container when the cursor is over it and there is more than fits.
     const onWheel = (e: WheelEvent) => {
+      const target = e.target;
+
+      if (target instanceof Element && target.closest(".app-detail")) return;
+
       if (matches.scrollBy(e.deltaY, e.clientX, e.clientY)) e.preventDefault();
     };
     window.addEventListener("wheel", onWheel, { passive: false });

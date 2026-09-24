@@ -2,11 +2,11 @@
 
 import {
   useEffect,
+  useRef,
+  useState,
   ViewTransition,
   type ReactElement,
 } from "react";
-
-import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import { DirectionalPage } from "@/components/DirectionalPage";
 
@@ -123,11 +123,7 @@ export function AppDetail({
 
         <div className="app-detail-copy">
           <TitleMorph trackId={detail.trackId}>
-            <h1>
-              {detail.name}
-              {" "}
-              <ProvenanceMark tier={detail.tier} />
-            </h1>
+            <h1>{detail.name}</h1>
           </TitleMorph>
 
           <p className="app-detail-mono">
@@ -162,6 +158,26 @@ function DetailFields({
 }) {
   return (
     <dl className="app-card-fields">
+      {detail.screenshotUrls.length > 0 ? (
+        <Field label="Screens">
+          <Shots urls={detail.screenshotUrls} />
+        </Field>
+      ) : null}
+
+      <Field label="Store">
+        <a
+          href={detail.storeUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open in App Store
+        </a>
+      </Field>
+
+      <Field label="About">
+        <About text={detail.description} />
+      </Field>
+
       <Field label="Seller">
         {detail.sellerName}
       </Field>
@@ -195,57 +211,31 @@ function DetailFields({
       </Field>
 
       <Field label="Rating">
-        <ProvenanceMark
-          tier={detail.rating.tier}
-        />
         {detail.rating.average !== null ? (
           <span>
-            {" "}
             {detail.rating.average.toFixed(1)}
             {" ("}
             {detail.rating.count?.toLocaleString()}
             {")"}
           </span>
         ) : (
-          <span> —</span>
+          <span>—</span>
         )}
       </Field>
 
       <Field label="Momentum">
-        <ProvenanceMark
-          tier={detail.momentum.tier}
-          method={
-            detail.momentum.tier === "estimated"
-              ? detail.momentum.method
-              : undefined
-          }
-        />
         {detail.momentum.tier === "estimated" ? (
-          <span>
-            {" "}
-            {detail.momentum.value}
-          </span>
+          <span>{detail.momentum.value}</span>
         ) : (
-          <span> —</span>
+          <span>—</span>
         )}
       </Field>
 
       <Field label="Downloads">
-        <ProvenanceMark
-          tier={detail.downloads.tier}
-          method={
-            detail.downloads.tier === "estimated"
-              ? detail.downloads.method
-              : undefined
-          }
-        />
         {detail.downloads.tier === "estimated" ? (
-          <span>
-            {" "}
-            {detail.downloads.value}
-          </span>
+          <span>{detail.downloads.value}</span>
         ) : (
-          <span> —</span>
+          <span>—</span>
         )}
       </Field>
 
@@ -268,11 +258,6 @@ function DetailFields({
       {detail.signals ? (
         <>
           <Field label="Icon color">
-            <ProvenanceMark
-              tier={detail.signals.tier}
-              method={detail.signals.method}
-            />
-            {" "}
             {detail.signals.colorText || "—"}
           </Field>
 
@@ -291,54 +276,125 @@ function DetailFields({
                 className="app-card-tag"
               >
                 {tag.tagId}
-                {" "}
-                <ProvenanceMark
-                  tier={tag.tier}
-                  method={tag.method}
-                />
               </span>
             ))}
           </span>
         </Field>
       ) : null}
 
-      <Field label="About">
-        <p className="app-card-about">
-          {detail.description}
-        </p>
-      </Field>
-
-      {detail.screenshotUrls.length > 0 ? (
-        <Field label="Screens">
-          <div className="app-card-shots">
-            {detail.screenshotUrls
-              .slice(0, 6)
-              .map((url) => (
-                <img
-                  key={url}
-                  src={url}
-                  alt=""
-                  loading="lazy"
-                />
-              ))}
-          </div>
-        </Field>
-      ) : null}
-
-      <Field label="Store">
-        <a
-          href={detail.storeUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open in App Store
-        </a>
-      </Field>
-
       <Field label="Fetched">
         {formatDate(detail.metadataFetchedAt)}
       </Field>
     </dl>
+  );
+}
+
+function Shots({
+  urls,
+}: {
+  urls: string[];
+}) {
+  const row = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = row.current;
+
+    if (!node) {
+      return;
+    }
+
+    const onWheel = (event: WheelEvent) => {
+      if (
+        Math.abs(event.deltaX)
+        > Math.abs(event.deltaY)
+      ) {
+        return;
+      }
+
+      const scroller = node.closest(".app-detail");
+
+      if (!(scroller instanceof HTMLElement)) {
+        return;
+      }
+
+      scroller.scrollTop += event.deltaY;
+      event.preventDefault();
+    };
+
+    node.addEventListener("wheel", onWheel, {
+      passive: false,
+    });
+
+    return () => {
+      node.removeEventListener("wheel", onWheel);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={row}
+      className="app-card-shots"
+    >
+      {urls.map((url) => (
+        <img
+          key={url}
+          src={url}
+          alt=""
+          loading="lazy"
+        />
+      ))}
+    </div>
+  );
+}
+
+function About({
+  text,
+}: {
+  text: string;
+}) {
+  const body = useRef<HTMLParagraphElement>(null);
+
+  const [open, setOpen] = useState(false);
+
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const node = body.current;
+
+    if (!node || open) {
+      return;
+    }
+
+    setOverflows(
+      node.scrollHeight > node.clientHeight + 1,
+    );
+  }, [text, open]);
+
+  return (
+    <>
+      <p
+        ref={body}
+        className={
+          open
+            ? "app-card-about"
+            : "app-card-about is-clamped"
+        }
+      >
+        {text}
+      </p>
+
+      {overflows ? (
+        <button
+          type="button"
+          className="app-card-more"
+          onClick={() => {
+            setOpen((value) => !value);
+          }}
+        >
+          {open ? "Less" : "More"}
+        </button>
+      ) : null}
+    </>
   );
 }
 
