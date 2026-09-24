@@ -76,6 +76,14 @@ body {
   letter-spacing: -0.005em;
 }
 
+.discovery-tier {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  margin-top: 0.65rem;
+}
+
 .composer {
   display: flex;
   width: 100%;
@@ -494,22 +502,15 @@ ol {
   border-radius: 12px;
   background: var(--color-panel);
   box-shadow: 0 24px 80px rgb(0 0 0 / 0.45);
-  opacity: 0;
-  transform: translateY(14px) scale(0.97);
-  transition:
-    opacity 420ms var(--ease-premium),
-    transform 480ms var(--ease-premium);
+  will-change: transform, opacity;
 }
 
-.app-card-root[data-phase="open"] .app-card-panel,
-.app-card-root[data-phase="enter"] .app-card-panel {
-  opacity: 1;
-  transform: none;
+.app-card-root[data-phase="exit"] .app-card-scrim {
+  opacity: 0;
 }
 
-.app-card-root[data-phase="exit"] .app-card-panel {
-  opacity: 0;
-  transform: translateY(10px) scale(0.98);
+.app-card-fields {
+  margin: 0;
 }
 
 .app-card-back {
