@@ -7,6 +7,8 @@ import {
 import type { Finalist } from "../lib/types";
 
 async function main(): Promise<void> {
+  delete process.env.OPENROUTER_API_KEY;
+
   delete process.env.TYPE_SAFE_KEY;
 
   const finalists: Finalist[] = [
@@ -96,6 +98,8 @@ async function main(): Promise<void> {
   ) {
     throw new Error("threshold filter wrong");
   }
+
+  delete process.env.OPENROUTER_API_KEY;
 
   delete process.env.TYPE_SAFE_KEY;
 }
