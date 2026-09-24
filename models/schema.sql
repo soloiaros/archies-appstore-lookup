@@ -118,3 +118,14 @@ create table if not exists icon_embeddings (
   vector blob not null,
   embedded_at text not null
 );
+
+create table if not exists icon_signals (
+  track_id integer primary key references apps (track_id),
+  tier text not null default 'estimated' check (
+    tier in ('verified', 'estimated', 'unavailable')
+  ),
+  method text not null,
+  color_text text not null,
+  colors text not null,
+  letters text not null
+);
