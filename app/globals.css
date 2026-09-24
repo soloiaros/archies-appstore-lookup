@@ -84,7 +84,9 @@ body {
   margin-top: 0.65rem;
 }
 
-.composer-beam {
+.composer-beam,
+.panel-beam,
+.notice-beam {
   display: block;
   width: 100%;
 }
@@ -175,7 +177,7 @@ body {
   flex-shrink: 0;
 }
 
-.notice-float,
+.notice-beam,
 .answer-float {
   pointer-events: auto;
   position: fixed;
@@ -191,9 +193,9 @@ body {
   gap: 1rem;
   box-sizing: border-box;
   padding: 0.65rem 0.65rem 0.65rem 1.5rem;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius);
-  background: var(--color-panel);
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 16px;
+  background: #1d1d1d;
 }
 
 .notice-float p {
@@ -208,24 +210,74 @@ body {
   width: 36px;
   height: 36px;
   place-items: center;
-  border: 1px solid var(--color-line);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text);
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f4f4f5;
+  color: #0b0b0c;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
   cursor: pointer;
+}
+
+.panel-frame {
+  position: relative;
+  box-sizing: border-box;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 16px;
+  background: #1d1d1d;
+  overflow: hidden;
 }
 
 .panel {
   box-sizing: border-box;
   max-height: min(42vh, 360px);
   overflow: auto;
+  overscroll-behavior: contain;
   margin: 0;
-  padding: 0.85rem 1rem;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius);
-  background: var(--color-panel);
+  padding: 1rem 1.25rem;
+  scroll-padding-block: 8px;
   color: var(--color-text);
   font-size: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+.panel-edge {
+  pointer-events: none;
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 8px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 220ms var(--ease-premium);
+}
+
+.panel-edge-top {
+  top: 1px;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    rgb(0 0 0 / 0.35) 40%,
+    transparent 100%
+  );
+}
+
+.panel-edge-bottom {
+  bottom: 1px;
+  mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    rgb(0 0 0 / 0.35) 40%,
+    transparent 100%
+  );
+}
+
+.panel-frame[data-above="true"] > .panel-edge-top,
+.panel-frame[data-below="true"] > .panel-edge-bottom {
+  opacity: 1;
 }
 
 .panel h2 {
@@ -674,7 +726,7 @@ ol {
 
 @media (max-width: 720px) {
   .stage-bar,
-  .notice-float,
+  .notice-beam,
   .answer-float {
     width: min(100vw - 24px, 620px);
   }
