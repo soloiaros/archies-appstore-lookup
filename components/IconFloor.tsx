@@ -186,10 +186,13 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       const height = (scene.height = canvas.clientHeight);
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
+      // mouse DPR
+      canvas.setAttribute("data-pixel-ratio", String(dpr));
+      mouse.pixelRatio = dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       // Small enough that the settled pile stays under the search bar: at most ~38% of the window, however many images there are.
       const fits = Math.sqrt((0.38 * height * width * 0.75) / Math.max(1, srcs.length));
-      scene.size = Math.max(10, Math.min(25, width / 55, fits));
+      scene.size = Math.max(20, Math.min(50, width / 27.5, fits));
       scene.bigSize = Math.max(64, Math.min(104, width / 12));
       scene.midSize = Math.max(40, Math.min(60, width / 22));
       setIconSize(scene.bigSize);

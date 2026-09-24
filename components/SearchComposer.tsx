@@ -1,12 +1,11 @@
 "use client";
 
+import { BorderBeam } from "border-beam";
 import {
   useEffect,
   useRef,
   useState,
 } from "react";
-
-import { Orb } from "@/components/fx/Orb";
 
 type Props = {
   value: string;
@@ -66,10 +65,11 @@ export function SearchComposer({
     onSubmit(input.current?.value ?? value);
   };
 
-  return (
+  const form = (
     <form
       role="search"
       data-ready={ready ? "true" : "false"}
+      data-busy={busy ? "true" : "false"}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -120,16 +120,26 @@ export function SearchComposer({
         }
         data-busy={busy ? "true" : "false"}
       >
-        <Orb
-          state={
-            busy
-              ? "searching"
-              : "breathing"
-          }
-          size={64}
-          display={30}
-        />
+        ↑
       </button>
     </form>
+  );
+
+  if (!ready) return form;
+
+  return (
+    <BorderBeam
+      size="pulse-inner"
+      colorVariant="mono"
+      theme="dark"
+      active
+      strength={busy ? 1 : 0.38}
+      duration={busy ? 1.35 : 3.2}
+      brightness={busy ? 1.55 : 1.15}
+      borderRadius={16}
+      className="composer-beam"
+    >
+      {form}
+    </BorderBeam>
   );
 }

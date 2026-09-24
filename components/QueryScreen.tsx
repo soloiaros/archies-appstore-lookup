@@ -100,7 +100,7 @@ export function QueryScreen({
   const route = useRoute(shape);
 
   const drawn = useMemo(
-    () => pileIcons.slice(0, Math.min(1200, pileIcons.length)),
+    () => pileIcons.slice(0, Math.min(300, pileIcons.length)),
     [pileIcons],
   );
 
