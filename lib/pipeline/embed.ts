@@ -8,8 +8,9 @@ import type {
 import {
   AutoProcessor,
   AutoTokenizer,
-  CLIPTextModelWithProjection,
-  CLIPVisionModelWithProjection,
+  RawImage,
+  SiglipTextModel,
+  SiglipVisionModel,
   load_image,
   pipeline,
 } from "@huggingface/transformers";
@@ -18,52 +19,49 @@ import type { FeatureExtractionPipeline } from "@huggingface/transformers";
 
 export const BGE_MODEL = "Xenova/bge-small-en-v1.5";
 
-export const CLIP_MODEL = "Xenova/clip-vit-base-patch32";
+export const SIGLIP_MODEL =
+  "onnx-community/siglip2-base-patch16-224-ONNX";
 
 export const BGE_DIMS = 384;
 
-export const CLIP_DIMS = 512;
+export const SIGLIP_DIMS = 768;
 
 export const BGE_METHOD = BGE_MODEL;
 
-export const CLIP_METHOD = CLIP_MODEL;
+export const SIGLIP_METHOD = SIGLIP_MODEL;
 
 const ASKING =
   "Represent this sentence for searching relevant passages: ";
 
-type ClipVision = Awaited<
-  ReturnType<
-    typeof CLIPVisionModelWithProjection.from_pretrained
-  >
+type SiglipVision = Awaited<
+  ReturnType<typeof SiglipVisionModel.from_pretrained>
 >;
 
-type ClipText = Awaited<
-  ReturnType<
-    typeof CLIPTextModelWithProjection.from_pretrained
-  >
+type SiglipText = Awaited<
+  ReturnType<typeof SiglipTextModel.from_pretrained>
 >;
 
-type ClipProcessor = Awaited<
+type SiglipProcessor = Awaited<
   ReturnType<typeof AutoProcessor.from_pretrained>
 >;
 
-type ClipTokenizer = Awaited<
+type SiglipTokenizer = Awaited<
   ReturnType<typeof AutoTokenizer.from_pretrained>
 >;
 
 type EmbedStore = {
   bge?: Promise<FeatureExtractionPipeline>;
 
-  clipVision?: Promise<{
-    processor: ClipProcessor;
+  siglipVision?: Promise<{
+    processor: SiglipProcessor;
 
-    vision: ClipVision;
+    vision: SiglipVision;
   }>;
 
-  clipText?: Promise<{
-    tokenizer: ClipTokenizer;
+  siglipText?: Promise<{
+    tokenizer: SiglipTokenizer;
 
-    text: ClipText;
+    text: SiglipText;
   }>;
 };
 
@@ -85,23 +83,22 @@ function bge(): Promise<FeatureExtractionPipeline> {
   ));
 }
 
-function clipVision(): Promise<{
-  processor: ClipProcessor;
+function siglipVision(): Promise<{
+  processor: SiglipProcessor;
 
-  vision: ClipVision;
+  vision: SiglipVision;
 }> {
   const cache = models();
 
-  return (cache.clipVision ??= (async () => {
+  return (cache.siglipVision ??= (async () => {
     const processor = await AutoProcessor.from_pretrained(
-      CLIP_MODEL,
+      SIGLIP_MODEL,
     );
 
-    const vision =
-      await CLIPVisionModelWithProjection.from_pretrained(
-        CLIP_MODEL,
-        { dtype: "q8" },
-      );
+    const vision = await SiglipVisionModel.from_pretrained(
+      SIGLIP_MODEL,
+      { dtype: "fp16" },
+    );
 
     return {
       processor,
@@ -110,23 +107,22 @@ function clipVision(): Promise<{
   })());
 }
 
-function clipText(): Promise<{
-  tokenizer: ClipTokenizer;
+function siglipText(): Promise<{
+  tokenizer: SiglipTokenizer;
 
-  text: ClipText;
+  text: SiglipText;
 }> {
   const cache = models();
 
-  return (cache.clipText ??= (async () => {
+  return (cache.siglipText ??= (async () => {
     const tokenizer = await AutoTokenizer.from_pretrained(
-      CLIP_MODEL,
+      SIGLIP_MODEL,
     );
 
-    const text =
-      await CLIPTextModelWithProjection.from_pretrained(
-        CLIP_MODEL,
-        { dtype: "q8" },
-      );
+    const text = await SiglipTextModel.from_pretrained(
+      SIGLIP_MODEL,
+      { dtype: "fp16" },
+    );
 
     return {
       tokenizer,
@@ -251,43 +247,50 @@ export async function embedAsking(
   return vector ?? new Float32Array(BGE_DIMS);
 }
 
-export async function embedIconUrl(
-  imageUrl: string,
+export async function embedIconImage(
+  image: RawImage,
 ): Promise<Float32Array> {
-  const { processor, vision } = await clipVision();
-
-  const image = await load_image(imageUrl);
+  const { processor, vision } = await siglipVision();
 
   const inputs = await processor(image);
 
   const outputs = await vision(inputs);
 
+  const pooled = outputs.pooler_output;
+
   return l2Normalize(
-    Float32Array.from(
-      flatten(outputs.image_embeds.data),
-    ),
+    Float32Array.from(flatten(pooled.data)),
   );
+}
+
+export async function embedIconUrl(
+  imageUrl: string,
+): Promise<Float32Array> {
+  const image = await load_image(imageUrl);
+
+  return embedIconImage(image);
 }
 
 export async function embedIconQuery(
   query: string,
 ): Promise<Float32Array> {
-  const { tokenizer, text } = await clipText();
+  const { tokenizer, text } = await siglipText();
 
   const inputs = tokenizer(
     query,
     {
-      padding: true,
+      padding: "max_length",
       truncation: true,
+      max_length: 64,
     },
   );
 
   const outputs = await text(inputs);
 
+  const pooled = outputs.pooler_output;
+
   return l2Normalize(
-    Float32Array.from(
-      flatten(outputs.text_embeds.data),
-    ),
+    Float32Array.from(flatten(pooled.data)),
   );
 }
 
@@ -345,7 +348,7 @@ export async function probeTextEmbedding(
 export async function probeIconEmbedding(
   imageUrl: string,
 ): Promise<{
-  model: "clip";
+  model: "siglip2";
 
   repo: string;
 
@@ -362,8 +365,8 @@ export async function probeIconEmbedding(
   const values = Array.from(vector);
 
   return {
-    model: "clip",
-    repo: CLIP_MODEL,
+    model: "siglip2",
+    repo: SIGLIP_MODEL,
     dimensions: values.length,
     finite: values.every(Number.isFinite),
     norm: l2(values),
