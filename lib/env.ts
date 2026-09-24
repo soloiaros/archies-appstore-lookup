@@ -45,13 +45,15 @@ export function loadLocalEnv(): void {
 }
 
 export function typesafeKey(): string | null {
-  const key = process.env.TYPE_SAFE_KEY;
+  const key =
+    process.env.OPENROUTER_API_KEY
+    || process.env.TYPE_SAFE_KEY;
 
   if (!key || key.trim() === "") {
     return null;
   }
 
-  return key;
+  return key.trim();
 }
 
 export function itunesCountry(): string {
