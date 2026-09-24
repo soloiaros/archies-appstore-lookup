@@ -75,6 +75,7 @@ export function createOverlays(
   };
   const onUp = (e: PointerEvent) => {
     if (!onPick || e.button !== 0) return;
+    if (e.target instanceof Element && e.target.closest("[data-seat]")) return;
 
     const over = hitAt(e.clientX, e.clientY);
 

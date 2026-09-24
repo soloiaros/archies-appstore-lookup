@@ -3,13 +3,18 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
+
+import { addTransitionType } from "react";
 
 import {
   AppCard,
+  IconMorph,
   originFromPick,
 } from "@/components/AppCard";
 
@@ -20,6 +25,7 @@ import { FactualCard } from "@/components/FactualCard";
 import {
   IconFloor,
   type FloorApi,
+  type Seat,
 } from "@/components/IconFloor";
 
 import { ProvenanceMark } from "@/components/ProvenanceMark";
@@ -74,6 +80,18 @@ export function QueryScreen({
   const [card, setCard] = useState<ReturnType<
     typeof originFromPick
   > | null>(null);
+
+  const [lift, setLift] = useState<ReturnType<
+    typeof originFromPick
+  > | null>(null);
+
+  const cardRef = useRef(card);
+
+  cardRef.current = card;
+
+  const [, startTransition] = useTransition();
+
+  const wasOpen = useRef(false);
 
   const shape =
     state.phase === "done"
@@ -180,7 +198,9 @@ export function QueryScreen({
         floor.current?.release();
       }
 
+      setLift(null);
       setCard(null);
+      floor.current?.ghost(null);
       setText(value);
 
       const now = performance.now();
@@ -198,20 +218,91 @@ export function QueryScreen({
     [matches.length],
   );
 
-  const onMatchOpen = useCallback(
-    (pick: MatchPick) => {
-      floor.current?.ghost(pick.match.src);
-      setCard(originFromPick(pick));
+  const endFlight = useCallback(() => {
+    if (cardRef.current) {
+      return;
+    }
+
+    floor.current?.ghost(null);
+  }, []);
+
+  const openCard = useCallback(
+    (
+      origin: ReturnType<typeof originFromPick>,
+    ) => {
+      startTransition(() => {
+        addTransitionType("card");
+        setCard(origin);
+      });
     },
     [],
   );
 
-  const onGhost = useCallback(
-    (src: string | null) => {
-      floor.current?.ghost(src);
+  const closeCard = useCallback(() => {
+    startTransition(() => {
+      addTransitionType("card");
+      setLift(null);
+      setCard(null);
+    });
+  }, []);
+
+  const onSeat = useCallback(
+    (seat: Seat) => {
+      floor.current?.ghost(seat.src);
+
+      openCard({
+        x: seat.left,
+        y: seat.top,
+        side: seat.side,
+        src: seat.src,
+        trackId: seat.trackId,
+        probability: seat.probability,
+      });
+    },
+    [openCard],
+  );
+
+  const onMatchOpen = useCallback(
+    (pick: MatchPick) => {
+      floor.current?.ghost(pick.match.src);
+      setLift(originFromPick(pick));
     },
     [],
   );
+
+  useLayoutEffect(() => {
+    if (!lift || card) {
+      return;
+    }
+
+    const origin = lift;
+
+    startTransition(() => {
+      addTransitionType("card");
+      setCard(origin);
+      setLift(null);
+    });
+  }, [lift, card]);
+
+  useEffect(() => {
+    if (card) {
+      wasOpen.current = true;
+
+      return;
+    }
+
+    if (!wasOpen.current) {
+      return;
+    }
+
+    const id = window.setTimeout(() => {
+      floor.current?.ghost(null);
+    }, 700);
+
+    return () => {
+      window.clearTimeout(id);
+    };
+  }, [card]);
 
   const discoveryTier =
     state.phase === "done"
@@ -256,6 +347,8 @@ export function QueryScreen({
         apiRef={floor}
         onReady={onFloorReady}
         onMatchOpen={onMatchOpen}
+        openTrackId={card?.trackId ?? null}
+        onSeat={onSeat}
       />
 
       <main className="stage-layer">
@@ -270,7 +363,9 @@ export function QueryScreen({
             onClear={() => {
               reset();
               setText("");
+              setLift(null);
               setCard(null);
+              floor.current?.ghost(null);
             }}
             busy={busy}
           />
@@ -323,8 +418,11 @@ export function QueryScreen({
               query={state.answer.query}
               app={state.answer.app}
               tier={state.answer.tier}
+              lifted={
+                card?.trackId === state.answer.app?.trackId
+              }
               onOpen={(origin) => {
-                setCard(origin);
+                openCard(origin);
               }}
             />
           </div>
@@ -342,14 +440,28 @@ export function QueryScreen({
         ) : null}
       </main>
 
+      {lift && !card ? (
+        <IconMorph trackId={lift.trackId}>
+          <img
+            className="icon-lift"
+            src={lift.src}
+            alt=""
+            draggable={false}
+            style={{
+              left: lift.x,
+              top: lift.y,
+              width: lift.side,
+              height: lift.side,
+            }}
+          />
+        </IconMorph>
+      ) : null}
+
       {card ? (
         <AppCard
           origin={card}
-          onGhost={onGhost}
-          onClose={() => {
-            floor.current?.ghost(null);
-            setCard(null);
-          }}
+          onFlightEnd={endFlight}
+          onClose={closeCard}
         />
       ) : null}
     </>

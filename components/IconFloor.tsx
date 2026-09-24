@@ -2,7 +2,8 @@
 
 import Matter from "matter-js";
 import { BorderBeam } from "border-beam";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { IconMorph } from "@/components/AppCard";
 import { createAtlas, type Sheet } from "./floor/atlas";
 import { createBounds } from "./floor/bounds";
 import { createDebug } from "./floor/debug";
@@ -17,6 +18,16 @@ import { createSwaps } from "./floor/swaps";
 import { createTilt } from "./floor/tilt";
 
 export type { Match };
+
+export type Seat = {
+  trackId: number;
+  src: string;
+  title: string;
+  probability: number;
+  left: number;
+  top: number;
+  side: number;
+};
 
 export type FloorApi = {
   /** Shake the pile. 0 is a nudge, 1 is a hard jolt. */
@@ -42,6 +53,8 @@ type Props = {
   /** Called once the world is built and `apiRef` is live. A rebuild means whatever was floating has to be sent again. */
   onReady?: () => void;
   onMatchOpen?: (pick: MatchPick) => void;
+  openTrackId?: number | null;
+  onSeat?: (seat: Seat) => void;
 };
 
 const loadImage = (src: string) => {
@@ -63,7 +76,7 @@ const loadImage = (src: string) => {
  * this the floor re-rendered with it: 180 label elements reconciled, and, because their ref was an inline arrow, 180
  * refs detached and re-attached, thirteen times a second. That alone was most of the jank while typing.
  */
-export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef, onReady, onMatchOpen }: Props) {
+export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef, onReady, onMatchOpen, openTrackId = null, onSeat }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const beamRef = useRef<HTMLDivElement>(null);
   const tipRef = useRef<HTMLDivElement>(null);
@@ -73,10 +86,24 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
   const labelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const onMatchOpenRef = useRef(onMatchOpen);
   onMatchOpenRef.current = onMatchOpen;
+  const onSeatRef = useRef(onSeat);
+  onSeatRef.current = onSeat;
+  const [seats, setSeats] = useState<Seat[]>([]);
+  const publishSeatsRef = useRef<(next: Seat[]) => void>(() => {});
+  publishSeatsRef.current = setSeats;
+  const domIds = useRef(new Set<number>());
+  const redrawRef = useRef<(() => void) | null>(null);
   // One callback per slot, made once. An inline arrow here is a new identity every render, which makes React drop and
   // re-take all 180 refs each time.
   const setLabel = useMemo(() => Array.from({ length: MOST }, (_, k) => (el: HTMLDivElement | null) => void (labelRefs.current[k] = el)), []);
   const [iconSize, setIconSize] = useState(96);
+
+  useLayoutEffect(() => {
+    const ids = new Set(seats.map((seat) => seat.trackId));
+    if (openTrackId != null) ids.add(openTrackId);
+    domIds.current = ids;
+    redrawRef.current?.();
+  }, [seats, openTrackId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -256,6 +283,8 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
 
     const paint = (i: number, scale: number) => {
       if (ghostSrc && srcs[i] === ghostSrc) return;
+      const held = holds.get(i);
+      if (held && domIds.current.has(held.match.trackId)) return;
       const sprite = (scale > 1 ? sharp.get(i) : null) ?? scene.atlas.patch(i);
       if (!sprite) return;
       const body = bodies[i];
@@ -303,6 +332,38 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
         ctx.restore();
       }
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    redrawRef.current = () => draw();
+
+    let seatSig = "";
+    const publishSeats = () => {
+      const box = scene.box;
+      if (!box) {
+        if (seatSig !== "") {
+          seatSig = "";
+          publishSeatsRef.current([]);
+        }
+        return;
+      }
+      const list: Seat[] = [];
+      holds.forEach((hold) => {
+        if (!hold.labelled && !hold.parked) return;
+        const side = hold.rest.side;
+        list.push({
+          trackId: hold.match.trackId,
+          src: hold.match.src,
+          title: hold.match.title,
+          probability: hold.match.probability,
+          left: hold.rest.x - box.x - side / 2,
+          top: hold.rest.y - box.y - side / 2,
+          side,
+        });
+      });
+      list.sort((a, b) => a.trackId - b.trackId);
+      const sig = list.map((seat) => `${seat.trackId}:${Math.round(seat.left)}:${Math.round(seat.top)}:${Math.round(seat.side)}`).join("|");
+      if (sig === seatSig) return;
+      seatSig = sig;
+      publishSeatsRef.current(list);
     };
 
     /**
@@ -381,6 +442,7 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       stats.gy = engine.gravity.y;
       if (awake) scene.dirty = true;
       overlays.place(now);
+      publishSeats();
       if (ghostSrc) {
         holds.forEach((hold, i) => {
           if (srcs[i] !== ghostSrc) return;
@@ -444,7 +506,7 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
           if (src && srcs[i] === src) el.style.opacity = "0";
           else if (hold.labelled) el.style.opacity = "1";
         });
-        scene.dirty = true;
+        draw();
       },
     };
     onReady?.();
@@ -479,6 +541,8 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       tilt.stop();
       swaps.stop();
       apiRef.current = null;
+      redrawRef.current = null;
+      publishSeatsRef.current([]);
       Matter.Composite.clear(engine.world, false);
       Matter.Engine.clear(engine);
     };
@@ -503,8 +567,24 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       </div>
       {/* The container again, in front of the canvas this time: it clips the labels and carries the soft edges that
           show there is more to scroll to. One probability label per match, each placed once in its cell. */}
-      <div ref={clipRef} aria-hidden data-above="false" data-below="false" className="match-clip pointer-events-none fixed left-0 top-0 z-20 overflow-hidden rounded-[5px]" style={{ opacity: 0 }}>
+      <div ref={clipRef} data-above="false" data-below="false" className="match-clip pointer-events-none fixed left-0 top-0 z-20 overflow-hidden rounded-[5px]" style={{ opacity: 0 }}>
         <div ref={contentRef} className="absolute inset-0 will-change-transform">
+          {seats.map((seat) =>
+            seat.trackId === openTrackId ? null : (
+              <IconMorph key={seat.trackId} trackId={seat.trackId}>
+                <button
+                  type="button"
+                  data-seat=""
+                  className="match-seat"
+                  aria-label={seat.title}
+                  style={{ width: seat.side, height: seat.side, left: seat.left, top: seat.top }}
+                  onClick={() => onSeatRef.current?.(seat)}
+                >
+                  <img src={seat.src} alt="" draggable={false} />
+                </button>
+              </IconMorph>
+            ),
+          )}
           {Array.from({ length: MOST }, (_, k) => (
             <div
               key={k}
