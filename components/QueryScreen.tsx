@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
   useTransition,
-  ViewTransition,
 } from "react";
 
 import { addTransitionType } from "react";
@@ -457,40 +456,19 @@ export function QueryScreen({
       />
 
       {detail ? (
-        <ViewTransition
-          enter={{
-            "nav-forward": "nav-forward",
-            "nav-back": "nav-back",
-            default: "none",
-          }}
-          exit={{
-            "nav-forward": "nav-forward",
-            "nav-back": "nav-back",
-            default: "none",
-          }}
-          default="none"
-        >
-          <AppDetail
-            detail={detail}
-            onFlightEnd={endFlight}
-            onBack={closeDetail}
-          />
-        </ViewTransition>
+        <AppDetail
+          detail={detail}
+          onFlightEnd={endFlight}
+          onBack={closeDetail}
+        />
       ) : (
-      <ViewTransition
-        enter={{
-          "nav-forward": "nav-forward",
-          "nav-back": "nav-back",
-          default: "none",
+      <main
+        className="stage-layer"
+        style={{
+          viewTransitionName: "search-page",
+          viewTransitionClass: "search-layer",
         }}
-        exit={{
-          "nav-forward": "nav-forward",
-          "nav-back": "nav-back",
-          default: "none",
-        }}
-        default="none"
       >
-      <main className="stage-layer">
         <div
           ref={bar}
           className="stage-bar"
@@ -588,7 +566,6 @@ export function QueryScreen({
           </div>
         ) : null}
       </main>
-      </ViewTransition>
       )}
 
       {lift && !detail ? (

@@ -88,11 +88,16 @@ export function AppDetail({
   }, [onBack]);
 
   return (
-    <div className="app-detail">
+    <div
+      className="app-detail"
+      style={{
+        viewTransitionName: "detail-page",
+        viewTransitionClass: "detail-layer",
+      }}
+    >
       <button
         type="button"
         className="app-detail-back"
-        style={{ viewTransitionName: "detail-back" }}
         onClick={onBack}
       >
         ← Search
