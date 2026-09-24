@@ -481,8 +481,11 @@ ol {
 .app-detail {
   position: fixed;
   inset: 0;
-  z-index: 30;
-  overflow: auto;
+  z-index: 40;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--color-ink);
   padding:
     max(1rem, env(safe-area-inset-top))
@@ -510,9 +513,8 @@ ol {
 }
 
 .app-detail-hero-wrap {
-  width: min(45vh, 100%);
-  max-width: 420px;
-  margin: 0 auto 1.5rem;
+  width: 5.5rem;
+  margin: 0 auto 1.25rem;
 }
 
 .app-detail-hero {
@@ -596,6 +598,24 @@ ol {
   white-space: pre-wrap;
 }
 
+.app-card-about.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: clip;
+}
+
+.app-card-more {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 .app-card-tags {
   display: flex;
   flex-wrap: wrap;
@@ -615,15 +635,18 @@ ol {
 
 .app-card-shots {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.65rem;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   padding-bottom: 0.25rem;
 }
 
 .app-card-shots img {
-  height: 120px;
+  height: min(52vh, 28rem);
   width: auto;
-  border-radius: 8px;
+  flex: none;
+  border-radius: 12px;
   object-fit: cover;
 }
 
@@ -664,10 +687,6 @@ ol {
     padding-right: 1rem;
   }
 
-  .app-detail-hero-wrap {
-    width: min(42vh, 100%);
-  }
-
   .app-detail-copy h1 {
     font-size: 1.5rem;
   }
@@ -682,17 +701,7 @@ ol {
   }
 }
 
-@media (min-width: 1025px) {
-  .app-detail-hero-wrap {
-    width: min(60vh, 480px);
-  }
-}
-
 @media (min-width: 721px) and (max-width: 1024px) {
-  .app-detail-hero-wrap {
-    width: min(55vh, 420px);
-  }
-
   .app-card-field {
     grid-template-columns: 6.5rem minmax(0, 1fr);
   }
