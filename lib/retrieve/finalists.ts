@@ -4,40 +4,40 @@ import { join } from "node:path";
 
 import type { DatabaseSync } from "node:sqlite";
 
-import {
-  cosine,
-  decodeVector,
-  embedAsking,
-  embedIconQuery,
-} from "@/lib/pipeline/embed";
+import { cosine } from "@/lib/pipeline/embed";
+
+import { embedAsking } from "@/lib/pipeline/embed";
+
+import { embedIconQuery } from "@/lib/pipeline/embed";
+
+import type { IndexedApp } from "@/lib/retrieve/memory";
+
+import { warmIndex } from "@/lib/retrieve/memory";
 
 import type { Finalist } from "@/lib/types";
 
-const BY_MEANING = 24;
+const BY_MEANING = 40;
 
-const BY_LOOKS = 12;
+const BY_LOOKS = 40;
 
 const BY_TAGS = 16;
 
-const BY_LEXICAL = 12;
+const BY_LEXICAL = 16;
 
-const FINALIST_CAP = 48;
+const BY_NAME = 25;
 
-type AppMeta = {
-  trackId: number;
+const FINALIST_CAP = 120;
 
-  name: string;
+const DEEPEN_CAP = 60;
 
-  description: string;
+const COLOR_WORD =
+  /\b(red|orange|yellow|green|blue|purple|violet|pink|brown|black|white|gr[ae]y|beige|cream|teal|cyan|navy|lime|gold|silver|magenta|maroon|turquoise|indigo|dark|light|bright|pastel|neon|colou?r\w*)\b/i;
 
-  iconUrl: string;
-};
-
-type TagRow = {
-  trackId: number;
-
-  tagId: string;
-};
+const LETTER_WORDS = new Set(
+  "letter letters text texts word words writing written write say says saying spelled printed reads read".split(
+    " ",
+  ),
+);
 
 type TagDef = {
   id: string;
@@ -45,43 +45,131 @@ type TagDef = {
   label: string;
 };
 
-type VectorRow = {
-  trackId: number;
-
-  vector: Buffer | Uint8Array;
-};
-
 let tagDefs: TagDef[] | null = null;
 
+export function queryMentionsColor(
+  query: string,
+): boolean {
+  return COLOR_WORD.test(query);
+}
+
+export function queryMentionsLetters(
+  query: string,
+): boolean {
+  return tokenize(query).some((word) =>
+    LETTER_WORDS.has(word),
+  );
+}
+
 export async function retrieveFinalists(
-  db: DatabaseSync,
+  _db: DatabaseSync,
   query: string,
 ): Promise<Finalist[]> {
-  const apps = loadApps(db);
+  const index = await warmIndex();
 
-  if (apps.length === 0) {
+  return rankFinalists(index.apps, query);
+}
+
+export async function deepenFinalists(
+  excluded: number[],
+  tagIds: string[],
+): Promise<Finalist[]> {
+  if (tagIds.length === 0) {
     return [];
   }
 
-  const byId = new Map(
-    apps.map((app) => [
-      app.trackId,
-      app,
-    ]),
-  );
+  const index = await warmIndex();
 
-  const tagsByApp = loadTags(db);
+  const skip = new Set(excluded);
 
+  const wanted = new Set(tagIds);
+
+  return index.apps
+    .filter(
+      (app) =>
+        !skip.has(app.trackId)
+        && app.tags.some((tag) => wanted.has(tag)),
+    )
+    .slice(0, DEEPEN_CAP)
+    .map((app) => toFinalist(app));
+}
+
+export async function topMeaningHits(
+  _db: DatabaseSync,
+  queryVector: Float32Array,
+  limit: number,
+): Promise<
+  Array<{
+    trackId: number;
+
+    score: number;
+
+    name: string;
+  }>
+> {
+  const index = await warmIndex();
+
+  return index.apps
+    .flatMap((app) => {
+      if (!app.text) {
+        return [];
+      }
+
+      return [
+        {
+          trackId: app.trackId,
+          score: cosine(queryVector, app.text),
+          name: app.name,
+        },
+      ];
+    })
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
+}
+
+export async function topIconHits(
+  _db: DatabaseSync,
+  queryVector: Float32Array,
+  limit: number,
+): Promise<
+  Array<{
+    trackId: number;
+
+    score: number;
+
+    name: string;
+  }>
+> {
+  const index = await warmIndex();
+
+  return index.apps
+    .flatMap((app) => {
+      if (!app.icon) {
+        return [];
+      }
+
+      return [
+        {
+          trackId: app.trackId,
+          score: cosine(queryVector, app.icon),
+          name: app.name,
+        },
+      ];
+    })
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
+}
+
+async function rankFinalists(
+  apps: IndexedApp[],
+  query: string,
+): Promise<Finalist[]> {
   const nominated = new Map<number, number>();
 
   const bump = (
     trackId: number,
     score: number,
   ) => {
-    if (!byId.has(trackId)) {
-      return;
-    }
-
     nominated.set(
       trackId,
       Math.max(
@@ -91,218 +179,103 @@ export async function retrieveFinalists(
     );
   };
 
-  const textRows = loadTextVectors(db);
+  const asking = embedAsking(query);
 
-  if (textRows.length > 0) {
-    const asking = await embedAsking(query);
+  const looking = embedIconQuery(query);
 
-    const ranked = textRows
-      .map((row) => ({
-        trackId: row.trackId,
-        score: cosine(
-          asking,
-          decodeVector(row.vector),
-        ),
-      }))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, BY_MEANING);
+  const [textVector, iconVector] = await Promise.all([
+    asking,
+    looking,
+  ]);
 
-    for (const hit of ranked) {
-      bump(hit.trackId, hit.score);
+  const meaning = apps
+    .flatMap((app) => {
+      if (!app.text) {
+        return [];
+      }
+
+      return [
+        {
+          trackId: app.trackId,
+          score: cosine(textVector, app.text),
+        },
+      ];
+    })
+    .sort((left, right) => right.score - left.score)
+    .slice(0, BY_MEANING);
+
+  for (const hit of meaning) {
+    bump(hit.trackId, hit.score);
+  }
+
+  const looks = apps
+    .flatMap((app) => {
+      if (!app.icon) {
+        return [];
+      }
+
+      return [
+        {
+          trackId: app.trackId,
+          score: cosine(iconVector, app.icon),
+        },
+      ];
+    })
+    .sort((left, right) => right.score - left.score)
+    .slice(0, BY_LOOKS);
+
+  for (const hit of looks) {
+    bump(hit.trackId, 0.5 + hit.score);
+  }
+
+  for (const hit of tagOverlap(query, apps).slice(0, BY_TAGS)) {
+    bump(hit.trackId, 0.4 + hit.score);
+  }
+
+  for (const hit of lexicalHits(query, apps).slice(0, BY_LEXICAL)) {
+    bump(hit.trackId, 0.3 + hit.score);
+  }
+
+  for (const hit of nameHits(query, apps).slice(0, BY_NAME)) {
+    bump(hit.trackId, 0.95);
+  }
+
+  if (queryMentionsLetters(query)) {
+    for (const hit of letterHits(query, apps)) {
+      bump(hit.trackId, 0.9);
     }
   }
 
-  const iconRows = loadIconVectors(db);
-
-  if (iconRows.length > 0) {
-    const looking = await embedIconQuery(query);
-
-    const ranked = iconRows
-      .map((row) => ({
-        trackId: row.trackId,
-        score: cosine(
-          looking,
-          decodeVector(row.vector),
-        ),
-      }))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, BY_LOOKS);
-
-    for (const hit of ranked) {
-      bump(
-        hit.trackId,
-        0.5 + hit.score,
-      );
-    }
-  }
-
-  const tagHits = tagOverlap(
-    query,
-    tagsByApp,
+  const byId = new Map(
+    apps.map((app) => [app.trackId, app]),
   );
 
-  for (const hit of tagHits.slice(0, BY_TAGS)) {
-    bump(
-      hit.trackId,
-      0.4 + hit.score,
-    );
-  }
-
-  const lexical = lexicalHits(
-    query,
-    apps,
-  );
-
-  for (const hit of lexical.slice(0, BY_LEXICAL)) {
-    bump(
-      hit.trackId,
-      0.3 + hit.score,
-    );
-  }
-
-  const ordered = [...nominated.entries()]
+  return [...nominated.entries()]
     .sort((left, right) => right[1] - left[1])
     .slice(0, FINALIST_CAP)
-    .map(([trackId]) => trackId);
+    .flatMap(([trackId]) => {
+      const app = byId.get(trackId);
 
-  return ordered.flatMap((trackId) => {
-    const app = byId.get(trackId);
+      if (!app) {
+        return [];
+      }
 
-    if (!app) {
-      return [];
-    }
-
-    return [
-      {
-        trackId: app.trackId,
-        name: app.name,
-        description: app.description,
-        iconUrl: app.iconUrl,
-        tags: tagsByApp.get(trackId) ?? [],
-      },
-    ];
-  });
+      return [toFinalist(app)];
+    });
 }
 
-export function topMeaningHits(
-  db: DatabaseSync,
-  queryVector: Float32Array,
-  limit: number,
-): Array<{
-  trackId: number;
-
-  score: number;
-
-  name: string;
-}> {
-  const apps = new Map(
-    loadApps(db).map((app) => [
-      app.trackId,
-      app.name,
-    ]),
-  );
-
-  return loadTextVectors(db)
-    .map((row) => ({
-      trackId: row.trackId,
-      score: cosine(
-        queryVector,
-        decodeVector(row.vector),
-      ),
-      name: apps.get(row.trackId) ?? String(row.trackId),
-    }))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, limit);
-}
-
-export function topIconHits(
-  db: DatabaseSync,
-  queryVector: Float32Array,
-  limit: number,
-): Array<{
-  trackId: number;
-
-  score: number;
-
-  name: string;
-}> {
-  const apps = new Map(
-    loadApps(db).map((app) => [
-      app.trackId,
-      app.name,
-    ]),
-  );
-
-  return loadIconVectors(db)
-    .map((row) => ({
-      trackId: row.trackId,
-      score: cosine(
-        queryVector,
-        decodeVector(row.vector),
-      ),
-      name: apps.get(row.trackId) ?? String(row.trackId),
-    }))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, limit);
-}
-
-function loadApps(
-  db: DatabaseSync,
-): AppMeta[] {
-  return db.prepare(`
-    select
-      track_id as trackId,
-      name,
-      description,
-      icon_url as iconUrl
-    from apps
-    where delisted = 0
-  `).all() as AppMeta[];
-}
-
-function loadTags(
-  db: DatabaseSync,
-): Map<number, string[]> {
-  const rows = db.prepare(`
-    select
-      track_id as trackId,
-      tag_id as tagId
-    from app_tags
-  `).all() as TagRow[];
-
-  const map = new Map<number, string[]>();
-
-  for (const row of rows) {
-    const list = map.get(row.trackId) ?? [];
-
-    list.push(row.tagId);
-
-    map.set(row.trackId, list);
-  }
-
-  return map;
-}
-
-function loadTextVectors(
-  db: DatabaseSync,
-): VectorRow[] {
-  return db.prepare(`
-    select
-      track_id as trackId,
-      vector
-    from text_embeddings
-  `).all() as VectorRow[];
-}
-
-function loadIconVectors(
-  db: DatabaseSync,
-): VectorRow[] {
-  return db.prepare(`
-    select
-      track_id as trackId,
-      vector
-    from icon_embeddings
-  `).all() as VectorRow[];
+function toFinalist(
+  app: IndexedApp,
+): Finalist {
+  return {
+    trackId: app.trackId,
+    name: app.name,
+    description: app.description,
+    iconUrl: app.iconUrl,
+    tags: app.tags,
+    colorText: app.colorText,
+    letters: app.letters,
+  };
 }
 
 function loadTagDefs(): TagDef[] {
@@ -331,7 +304,7 @@ function loadTagDefs(): TagDef[] {
 
 function tagOverlap(
   query: string,
-  tagsByApp: Map<number, string[]>,
+  apps: IndexedApp[],
 ): Array<{
   trackId: number;
 
@@ -367,10 +340,10 @@ function tagOverlap(
     score: number;
   }> = [];
 
-  for (const [trackId, tags] of tagsByApp) {
+  for (const app of apps) {
     let hits = 0;
 
-    for (const tag of tags) {
+    for (const tag of app.tags) {
       if (matched.has(tag)) {
         hits += 1;
       }
@@ -378,7 +351,7 @@ function tagOverlap(
 
     if (hits > 0) {
       scores.push({
-        trackId,
+        trackId: app.trackId,
         score: hits / matched.size,
       });
     }
@@ -391,7 +364,7 @@ function tagOverlap(
 
 function lexicalHits(
   query: string,
-  apps: AppMeta[],
+  apps: IndexedApp[],
 ): Array<{
   trackId: number;
 
@@ -426,6 +399,67 @@ function lexicalHits(
     })
     .filter((row) => row.score > 0)
     .sort((left, right) => right.score - left.score);
+}
+
+function nameHits(
+  query: string,
+  apps: IndexedApp[],
+): Array<{
+  trackId: number;
+
+  score: number;
+}> {
+  const words = tokenize(query).filter(
+    (word) => word.length >= 4,
+  );
+
+  if (words.length === 0) {
+    return [];
+  }
+
+  return apps
+    .filter((app) => {
+      const name = app.name.toLowerCase();
+
+      return words.some((word) => name.includes(word));
+    })
+    .map((app) => ({
+      trackId: app.trackId,
+      score: 1,
+    }));
+}
+
+function letterHits(
+  query: string,
+  apps: IndexedApp[],
+): Array<{
+  trackId: number;
+
+  score: number;
+}> {
+  const words = tokenize(query).filter(
+    (word) =>
+      word.length >= 3
+      && !LETTER_WORDS.has(word),
+  );
+
+  if (words.length === 0) {
+    return [];
+  }
+
+  return apps
+    .filter((app) => {
+      const letters = app.letters.toLowerCase();
+
+      return (
+        letters.length > 0
+        && words.some((word) => letters.includes(word))
+      );
+    })
+    .map((app) => ({
+      trackId: app.trackId,
+      score: 1,
+    }));
 }
 
 function tokenize(

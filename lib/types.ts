@@ -17,6 +17,10 @@ export type Finalist = {
   iconUrl: string;
 
   tags: string[];
+
+  colorText?: string;
+
+  letters?: string;
 };
 
 export type FactualApp = {
