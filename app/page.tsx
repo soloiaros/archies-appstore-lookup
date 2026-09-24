@@ -6,7 +6,7 @@ import { pileScene } from "@/lib/catalog/pile";
 
 export const dynamic = "force-dynamic";
 
-const PILE = 1200;
+const PILE = 300;
 
 const shuffle = <T,>(list: T[]) => {
   for (let i = list.length - 1; i > 0; i--) {

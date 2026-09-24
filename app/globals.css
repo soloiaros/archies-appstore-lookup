@@ -84,6 +84,11 @@ body {
   margin-top: 0.65rem;
 }
 
+.composer-beam {
+  display: block;
+  width: 100%;
+}
+
 .composer {
   display: flex;
   width: 100%;
@@ -91,16 +96,15 @@ body {
   gap: 0.75rem;
   box-sizing: border-box;
   margin: 0;
-  padding: 0.75rem 0.75rem 0.75rem 1.5rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  background: color-mix(in srgb, var(--color-panel) 95%, transparent);
-  backdrop-filter: blur(24px);
+  padding: 0.85rem 0.85rem 0.85rem 1.5rem;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 16px;
+  background: #1d1d1d;
   transition: border-color 300ms var(--ease-premium);
 }
 
 .composer:focus-within {
-  border-color: var(--color-line-strong);
+  border-color: rgb(255 255 255 / 0.18);
 }
 
 .composer input {
@@ -123,34 +127,45 @@ body {
 
 .composer button {
   display: grid;
-  width: 48px;
-  height: 48px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   flex-shrink: 0;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--color-text);
+  border: 0;
+  border-radius: 50%;
+  background: #f4f4f5;
+  color: #0b0b0c;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
   transition:
-    border-color 300ms var(--ease-premium),
-    background 300ms var(--ease-premium),
+    background 200ms var(--ease-premium),
     transform 200ms var(--ease-premium),
     opacity 200ms ease;
 }
 
 .composer button:enabled:hover {
-  border-color: var(--color-line-strong);
-  background: rgb(255 255 255 / 0.06);
+  background: #ffffff;
 }
 
 .composer button:enabled:active {
   transform: scale(0.95);
 }
 
+.composer[data-busy="true"] button {
+  animation: composer-pulse 1s var(--ease-premium) infinite;
+}
+
 .composer button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+@keyframes composer-pulse {
+  50% {
+    transform: scale(0.92);
+  }
 }
 
 .orb-slot {
@@ -665,7 +680,7 @@ ol {
   }
 
   .composer {
-    padding: 0.65rem 0.65rem 0.65rem 1.1rem;
+    padding: 0.7rem 0.7rem 0.7rem 1.15rem;
   }
 
   .composer input {
@@ -674,8 +689,8 @@ ol {
   }
 
   .composer button {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   .notice-float p {
@@ -867,7 +882,8 @@ ol {
   .match-tip,
   .match-tip > div,
   .match-tip p,
-  .app-detail-back {
+  .app-detail-back,
+  .composer[data-busy="true"] button {
     transition: none !important;
     animation: none !important;
   }
