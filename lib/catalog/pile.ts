@@ -14,7 +14,9 @@ export type PileScene = {
   indexed: number;
 };
 
-export function pileScene(): PileScene {
+export function pileScene(
+  limit = 96,
+): PileScene {
   const db = openCatalog();
 
   try {
@@ -29,9 +31,10 @@ export function pileScene(): PileScene {
         icon_url as iconUrl
       from apps
       where icon_url != ''
+        and delisted = 0
       order by track_id
-      limit 96
-    `).all() as PileIcon[];
+      limit ?
+    `).all(limit) as PileIcon[];
 
     const icons = rows.map((row) => ({
       trackId: Number(row.trackId),
