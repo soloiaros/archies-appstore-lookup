@@ -22,6 +22,8 @@ import {
   type FloorApi,
 } from "@/components/IconFloor";
 
+import { ProvenanceMark } from "@/components/ProvenanceMark";
+
 import { SearchComposer } from "@/components/SearchComposer";
 
 import { StoreMark } from "@/components/ui/StoreMark";
@@ -81,7 +83,7 @@ export function QueryScreen({
   const route = useRoute(shape);
 
   const drawn = useMemo(
-    () => pileIcons.slice(0, 500),
+    () => pileIcons.slice(0, Math.min(1200, pileIcons.length)),
     [pileIcons],
   );
 
@@ -198,10 +200,24 @@ export function QueryScreen({
 
   const onMatchOpen = useCallback(
     (pick: MatchPick) => {
+      floor.current?.ghost(pick.match.src);
       setCard(originFromPick(pick));
     },
     [],
   );
+
+  const onGhost = useCallback(
+    (src: string | null) => {
+      floor.current?.ghost(src);
+    },
+    [],
+  );
+
+  const discoveryTier =
+    state.phase === "done"
+    && state.answer.shape === "discovery"
+      ? state.answer.tier
+      : null;
 
   const busy = state.phase === "loading";
 
@@ -267,6 +283,15 @@ export function QueryScreen({
               apps indexed
             </span>
           </div>
+
+          {discoveryTier
+          && matches.length > 0 ? (
+            <p className="discovery-tier">
+              <ProvenanceMark
+                tier={discoveryTier}
+              />
+            </p>
+          ) : null}
         </div>
 
         {notice ? (
@@ -320,7 +345,9 @@ export function QueryScreen({
       {card ? (
         <AppCard
           origin={card}
+          onGhost={onGhost}
           onClose={() => {
+            floor.current?.ghost(null);
             setCard(null);
           }}
         />

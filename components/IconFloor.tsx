@@ -29,6 +29,8 @@ export type FloorApi = {
   add: (src: string) => void;
   /** Let the MacBook's motion sensor steer gravity, or not. */
   setMotion: (on: boolean) => void;
+  /** Hide one match while its flyer is mid-flight, so a second icon never flashes. */
+  ghost: (src: string | null) => void;
 };
 
 type Props = {
@@ -45,7 +47,8 @@ type Props = {
 const loadImage = (src: string) => {
   const img = new Image();
   img.decoding = "async";
-  if (/^https?:/i.test(src)) img.crossOrigin = "anonymous";
+  // same-origin only — mzstatic has no CORS
+  if (src.startsWith("/") || src.startsWith(location.origin)) img.crossOrigin = "anonymous";
   img.src = src;
   return img;
 };
@@ -206,7 +209,17 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       };
     };
     const stats = { stepMs: 0, drawMs: 0, awake: 0, swaps: 0, gx: 0, gy: 1, paced }; // read from the console as window.__floor when chasing lag
-    (window as unknown as { __floor?: unknown }).__floor = Object.assign(stats, createDebug(scene));
+    (window as unknown as { __floor?: unknown }).__floor = Object.assign(stats, createDebug(scene), {
+      added: () => scene.added,
+      bodyCount: () => bodies.length,
+      patchCount: () => {
+        let n = 0;
+        for (let i = 0; i < srcs.length; i++) if (scene.atlas.patch(i)) n++;
+        return n;
+      },
+      sheetReady: () => !!(scene.sheetImg?.complete && scene.sheetImg.naturalWidth),
+      ghost: () => ghostSrc,
+    });
     const overlays = createOverlays(
       scene,
       {
@@ -239,7 +252,10 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       for (let i = 0; i < 500; i++) Matter.Engine.update(engine, STEP);
     }
 
+    let ghostSrc: string | null = null;
+
     const paint = (i: number, scale: number) => {
+      if (ghostSrc && srcs[i] === ghostSrc) return;
       const sprite = (scale > 1 ? sharp.get(i) : null) ?? scene.atlas.patch(i);
       if (!sprite) return;
       const body = bodies[i];
@@ -365,6 +381,14 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       stats.gy = engine.gravity.y;
       if (awake) scene.dirty = true;
       overlays.place(now);
+      if (ghostSrc) {
+        holds.forEach((hold, i) => {
+          if (srcs[i] !== ghostSrc) return;
+          const el = labelRefs.current[hold.label];
+          if (el) el.style.opacity = "0";
+          if (hold.rank === 0 && beamRef.current) beamRef.current.style.opacity = "0";
+        });
+      }
       if (scene.dirty) {
         const t0 = performance.now();
         draw();
@@ -373,6 +397,12 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       } else if (pops.size) drawSwaps();
     };
     raf = requestAnimationFrame(frame);
+    // Background / automated tabs throttle rAF to nothing; drive the loop from a timer too.
+    const keep = window.setInterval(() => {
+      if (performance.now() - last < 100) return;
+      cancelAnimationFrame(raf);
+      frame(performance.now());
+    }, 33);
 
     apiRef.current = {
       shake(intensity) {
@@ -406,6 +436,16 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
         scene.dirty = true;
       },
       setMotion: (on) => tilt.set(on),
+      ghost(src) {
+        ghostSrc = src;
+        holds.forEach((hold, i) => {
+          const el = labelRefs.current[hold.label];
+          if (!el) return;
+          if (src && srcs[i] === src) el.style.opacity = "0";
+          else if (hold.labelled) el.style.opacity = "1";
+        });
+        scene.dirty = true;
+      },
     };
     onReady?.();
 
@@ -431,6 +471,7 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
 
     return () => {
       cancelAnimationFrame(raf);
+      window.clearInterval(keep);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("wheel", onWheel);
       overlays.destroy();
