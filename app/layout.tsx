@@ -4,6 +4,8 @@ import { GeistMono } from "geist/font/mono";
 
 import { GeistSans } from "geist/font/sans";
 
+import { SocialLinks } from "@/components/SocialLinks";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,6 +29,8 @@ export default function RootLayout({
         className="font-sans antialiased"
         suppressHydrationWarning
       >
+        <SocialLinks />
+
         {children}
       </body>
     </html>

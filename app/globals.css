@@ -926,6 +926,254 @@ ol {
   animation: none;
 }
 
+.locker {
+  --locker-metal: #6a6a6e;
+  --locker-metal-hi: #7e7e82;
+  --locker-metal-lo: #525256;
+  --locker-ink: #2a2a2e;
+  --locker-w: 11.5rem;
+  --locker-h: 2.35rem;
+  --locker-radius: 999px;
+  --locker-swing: 520ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  pointer-events: none;
+  position: fixed;
+  z-index: 40;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(0.85rem, env(safe-area-inset-right));
+  width: var(--locker-w);
+  height: var(--locker-h);
+  overflow: visible;
+}
+
+.locker-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  perspective: 720px;
+  perspective-origin: 50% 0%;
+  transform-style: preserve-3d;
+}
+
+.locker-bay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--locker-radius);
+  background: #323236;
+  box-shadow:
+    inset 6px 6px 12px rgb(0 0 0 / 0.72),
+    inset -4px -4px 8px rgb(255 255 255 / 0.06),
+    3px 3px 6px rgb(0 0 0 / 0.35),
+    -2px -2px 4px rgb(255 255 255 / 0.03);
+  opacity: 0;
+  transform: translateZ(-2px);
+  transition: opacity 160ms ease;
+}
+
+.locker[data-open="true"] .locker-bay {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+.locker-shelf {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0 0.55rem;
+  box-sizing: border-box;
+}
+
+.locker-link {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  margin: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #c8c8cc;
+  background: transparent;
+  text-decoration: none;
+  box-shadow:
+    1px 1px 2px rgb(0 0 0 / 0.35),
+    -1px -1px 2px rgb(255 255 255 / 0.05);
+}
+
+.locker-link[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+a.locker-link:hover {
+  color: #f0f0f2;
+}
+
+a.locker-link:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.35);
+  outline-offset: 2px;
+}
+
+.locker-github {
+  gap: 0.35rem;
+  min-width: auto;
+  padding: 0 0.55rem 0 0.4rem;
+  color: #ececef;
+  font-size: 12px;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.locker-door {
+  pointer-events: auto;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: var(--locker-radius);
+  background: transparent;
+  cursor: pointer;
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  transform: rotateX(0deg);
+  transition: transform var(--locker-swing);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.locker[data-open="true"] .locker-door {
+  transform: rotateX(-178deg);
+}
+
+.locker-door:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.35);
+  outline-offset: 3px;
+}
+
+.locker-door-front,
+.locker-door-back {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  background-color: var(--locker-metal);
+  background-image:
+    linear-gradient(
+      165deg,
+      var(--locker-metal-hi) 0%,
+      transparent 42%,
+      transparent 58%,
+      var(--locker-metal-lo) 100%
+    ),
+    radial-gradient(
+      circle at 1px 1px,
+      rgb(255 255 255 / 0.04) 1px,
+      transparent 0
+    );
+  background-size:
+    auto,
+    3px 3px;
+  box-shadow:
+    7px 7px 16px rgb(0 0 0 / 0.58),
+    -5px -5px 12px rgb(255 255 255 / 0.07),
+    inset 1px 1px 1.5px rgb(255 255 255 / 0.2),
+    inset -1px -1px 2px rgb(0 0 0 / 0.38);
+}
+
+.locker-door-back {
+  transform: rotateX(180deg);
+}
+
+.locker-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.7rem;
+  box-sizing: border-box;
+}
+
+.locker-latch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+
+.locker-knob {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  background: #5c5c60;
+  box-shadow:
+    2px 2px 3px rgb(0 0 0 / 0.45),
+    -1px -1px 2px rgb(255 255 255 / 0.16),
+    inset 0 1px 1px rgb(255 255 255 / 0.18);
+}
+
+.locker-slot {
+  width: 0.55rem;
+  height: 0.14rem;
+  border-radius: 999px;
+  background: var(--locker-ink);
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 0.55),
+    0 0.5px 0 rgb(255 255 255 / 0.12);
+}
+
+.locker-vents {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.locker-vents > span {
+  display: block;
+  height: 0.13rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgb(0 0 0 / 0.28),
+    rgb(0 0 0 / 0.18) 50%,
+    rgb(0 0 0 / 0.28)
+  );
+  box-shadow:
+    inset 0 1px 1px rgb(0 0 0 / 0.45),
+    0 1px 0 rgb(255 255 255 / 0.14);
+}
+
+.locker-dots {
+  display: grid;
+  grid-template-columns: repeat(3, 0.28rem);
+  grid-template-rows: repeat(3, 0.28rem);
+  gap: 0.22rem;
+}
+
+.locker-dots > span {
+  display: block;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.28);
+  box-shadow:
+    inset 1px 1px 1.5px rgb(0 0 0 / 0.55),
+    inset -0.5px -0.5px 1px rgb(255 255 255 / 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .match-label,
@@ -935,9 +1183,15 @@ ol {
   .match-tip > div,
   .match-tip p,
   .app-detail-back,
-  .composer[data-busy="true"] button {
+  .composer[data-busy="true"] button,
+  .locker-door,
+  .locker-bay {
     transition: none !important;
     animation: none !important;
+  }
+
+  .locker[data-open="true"] .locker-door {
+    transform: rotateX(-178deg);
   }
 
   ::view-transition-old(*),
