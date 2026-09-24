@@ -1,18 +1,40 @@
 import { typesafeKey } from "@/lib/env";
 
 const ENDPOINT =
-  "https://api.typesafe.ai/v1/systemone";
+  "https://openrouter.ai/api/v1/systemone";
+
+export type SystemOneFailure =
+  | "missing-key"
+  | "rejected"
+  | "unavailable";
+
+export type SystemOneResult<T> =
+  | {
+      ok: true;
+
+      data: T;
+    }
+  | {
+      ok: false;
+
+      reason: SystemOneFailure;
+    };
 
 export async function systemOne<T>(
   body: Record<string, unknown>,
   timeoutMs: number,
   fetchImpl: typeof fetch = fetch,
-): Promise<T | null> {
+): Promise<SystemOneResult<T>> {
   const key = typesafeKey();
 
   if (!key) {
-    return null;
+    return {
+      ok: false,
+      reason: "missing-key",
+    };
   }
+
+  let rejected = false;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const started = performance.now();
@@ -35,21 +57,41 @@ export async function systemOne<T>(
       );
 
       if (response.ok) {
-        return (await response.json()) as T;
+        return {
+          ok: true,
+          data: (await response.json()) as T,
+        };
+      }
+
+      if (response.status === 401) {
+        rejected = true;
+
+        break;
       }
 
       if (
         response.status !== 429
         && response.status < 500
       ) {
-        return null;
+        return {
+          ok: false,
+          reason: "unavailable",
+        };
       }
     } catch {
       if (performance.now() - started > 2000) {
-        return null;
+        return {
+          ok: false,
+          reason: "unavailable",
+        };
       }
     }
   }
 
-  return null;
+  return {
+    ok: false,
+    reason: rejected
+      ? "rejected"
+      : "unavailable",
+  };
 }

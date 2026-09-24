@@ -77,11 +77,11 @@ export async function scoreFinalists(
     options.fetchImpl,
   );
 
-  if (!data) {
+  if (!data.ok) {
     return {
       status: "unavailable",
       scores: [],
-      reason: "Scoring needs TYPE_SAFE_KEY.",
+      reason: scoreReason(data.reason),
     };
   }
 
@@ -91,7 +91,7 @@ export async function scoreFinalists(
     scores: finalists.map((finalist, index) => ({
       trackId: finalist.trackId,
       probability:
-        data.answers[`c${index}`]?.noul ?? 0.5,
+        data.data.answers[`c${index}`]?.noul ?? 0.5,
     })),
   };
 }
@@ -108,6 +108,20 @@ export function aboveThreshold(
       (left, right) =>
         right.probability - left.probability,
     );
+}
+
+function scoreReason(
+  reason: "missing-key" | "rejected" | "unavailable",
+): string {
+  if (reason === "missing-key") {
+    return "Scoring needs an OpenRouter key.";
+  }
+
+  if (reason === "rejected") {
+    return "Jev rejected the API key.";
+  }
+
+  return "Jev did not answer.";
 }
 
 function infoLine(
