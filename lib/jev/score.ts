@@ -2,6 +2,11 @@ import { systemOne } from "@/lib/jev/call";
 
 import { SCORE_INSTRUCTIONS } from "@/lib/jev/prompt";
 
+import {
+  queryMentionsColor,
+  queryMentionsLetters,
+} from "@/lib/retrieve/finalists";
+
 import type { Finalist } from "@/lib/types";
 
 export type ScoredFinalist = {
@@ -50,7 +55,10 @@ export async function scoreFinalists(
       type: "noul",
       instructions: {
         candidate: {
-          written_info: infoLine(finalist),
+          written_info: infoLine(
+            finalist,
+            query,
+          ),
         },
         question:
           "Does `candidate` fit what `looking_for` describes?",
@@ -73,7 +81,7 @@ export async function scoreFinalists(
       },
       questions,
     },
-    8000,
+    15000,
     options.fetchImpl,
   );
 
@@ -126,14 +134,31 @@ function scoreReason(
 
 function infoLine(
   finalist: Finalist,
+  query: string,
 ): string {
   const tags =
     finalist.tags.length > 0
       ? finalist.tags.join(", ")
       : "none";
 
-  return [
+  const parts = [
     `${finalist.name}: ${finalist.description.slice(0, 420)}`,
     `tags: ${tags}`,
-  ].join(" | ");
+  ];
+
+  if (
+    queryMentionsColor(query)
+    && finalist.colorText
+  ) {
+    parts.push(`colors: ${finalist.colorText}`);
+  }
+
+  if (
+    queryMentionsLetters(query)
+    && finalist.letters
+  ) {
+    parts.push(`letters: ${finalist.letters}`);
+  }
+
+  return parts.join(" | ");
 }
