@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-09-23T20:06:05.227Z",
+  "checkedAt": "2026-09-24T18:35:41.337Z",
   "counts": {
     "textEmbeddings": 6417,
     "iconEmbeddings": 6417,
@@ -315,6 +315,99 @@
         }
       ],
       "plausible": true
+    },
+    {
+      "query": "green owl mascot icon",
+      "top": [
+        {
+          "trackId": 1532627187,
+          "name": "BetterAppIcons",
+          "score": 0.6095
+        },
+        {
+          "trackId": 6751105633,
+          "name": "StickerMind",
+          "score": 0.5898
+        },
+        {
+          "trackId": 1458740001,
+          "name": "Sticker.ly - Sticker Maker",
+          "score": 0.5872
+        },
+        {
+          "trackId": 6447543971,
+          "name": "Cool Themes & Fonts: Cute Text",
+          "score": 0.5863
+        },
+        {
+          "trackId": 6763980664,
+          "name": "EmojiWall-Emojis & Wallpapers",
+          "score": 0.5845
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "yellow bird logo",
+      "top": [
+        {
+          "trackId": 1474586978,
+          "name": "Picture Bird: Bird identifier",
+          "score": 0.6266
+        },
+        {
+          "trackId": 6737123019,
+          "name": "Rebrand - AI Logo Maker",
+          "score": 0.6154
+        },
+        {
+          "trackId": 6449354786,
+          "name": "Bird Sounds Identifier Call ID",
+          "score": 0.5975
+        },
+        {
+          "trackId": 1190077343,
+          "name": "Boon: AI Logo Maker & Design",
+          "score": 0.5922
+        },
+        {
+          "trackId": 6745779947,
+          "name": "Logo Maker - AI Art Design",
+          "score": 0.5785
+        }
+      ],
+      "plausible": true
+    },
+    {
+      "query": "icon that says paypal",
+      "top": [
+        {
+          "trackId": 283646709,
+          "name": "PayPal - Pay, Send, Save",
+          "score": 0.7079
+        },
+        {
+          "trackId": 6761405215,
+          "name": "App Icon Extractor",
+          "score": 0.6578
+        },
+        {
+          "trackId": 980492665,
+          "name": "Mister Icon",
+          "score": 0.6484
+        },
+        {
+          "trackId": 6447543971,
+          "name": "Cool Themes & Fonts: Cute Text",
+          "score": 0.6441
+        },
+        {
+          "trackId": 6756040790,
+          "name": "StitchPal - Embroidery Guides",
+          "score": 0.6427
+        }
+      ],
+      "plausible": true
     }
   ],
   "icons": [
@@ -322,29 +415,29 @@
       "query": "simple blue square icon",
       "top": [
         {
+          "trackId": 6805340735,
+          "name": "JKST Note",
+          "score": 0.1941
+        },
+        {
+          "trackId": 1435368303,
+          "name": "Square Team",
+          "score": 0.185
+        },
+        {
+          "trackId": 978516833,
+          "name": "Stripe Dashboard",
+          "score": 0.185
+        },
+        {
+          "trackId": 1532627187,
+          "name": "BetterAppIcons",
+          "score": 0.1806
+        },
+        {
           "trackId": 1512938504,
           "name": "Code App",
-          "score": 0.3466
-        },
-        {
-          "trackId": 719171358,
-          "name": "Intune Company Portal",
-          "score": 0.3462
-        },
-        {
-          "trackId": 1439623630,
-          "name": "sendit - get it now",
-          "score": 0.3407
-        },
-        {
-          "trackId": 1589618453,
-          "name": "Walletsmith: Wallet Pass Maker",
-          "score": 0.339
-        },
-        {
-          "trackId": 1565576987,
-          "name": "Bilt Rewards",
-          "score": 0.3387
+          "score": 0.18
         }
       ],
       "plausible": true
@@ -353,29 +446,29 @@
       "query": "green owl mascot icon",
       "top": [
         {
-          "trackId": 284876795,
-          "name": "Tripadvisor: Plan & Book Trips",
-          "score": 0.394
-        },
-        {
-          "trackId": 1397382074,
-          "name": "NightOwl Companion",
-          "score": 0.3672
+          "trackId": 1564333761,
+          "name": "BudWatcher",
+          "score": 0.1843
         },
         {
           "trackId": 6479742882,
           "name": "Seeing",
-          "score": 0.3669
-        },
-        {
-          "trackId": 1564333761,
-          "name": "BudWatcher",
-          "score": 0.3649
+          "score": 0.1701
         },
         {
           "trackId": 570060128,
           "name": "Duolingo: Language Lessons",
-          "score": 0.3585
+          "score": 0.1636
+        },
+        {
+          "trackId": 1397382074,
+          "name": "NightOwl Companion",
+          "score": 0.1634
+        },
+        {
+          "trackId": 284876795,
+          "name": "Tripadvisor: Plan & Book Trips",
+          "score": 0.1481
         }
       ],
       "plausible": true
@@ -386,30 +479,230 @@
         {
           "trackId": 1634119476,
           "name": "Parental Control BrightCanary",
-          "score": 0.337
+          "score": 0.1809
         },
         {
           "trackId": 773457673,
           "name": "Merlin Bird ID by Cornell Lab",
-          "score": 0.3329
+          "score": 0.1639
         },
         {
-          "trackId": 6670330506,
-          "name": "Libre by Abbott",
-          "score": 0.3205
-        },
-        {
-          "trackId": 474500851,
-          "name": "Yandex Navi – navigation, maps",
-          "score": 0.3198
+          "trackId": 299219152,
+          "name": "Lufthansa",
+          "score": 0.1603
         },
         {
           "trackId": 555643284,
           "name": "iKitesurf: Weather & Waves",
-          "score": 0.3174
+          "score": 0.1502
+        },
+        {
+          "trackId": 1572726721,
+          "name": "Python Recipes Pro",
+          "score": 0.145
         }
       ],
       "plausible": true
+    }
+  ],
+  "scored": [
+    {
+      "query": "minimalist habit tracker",
+      "embedMs": 270,
+      "jevMs": 2318,
+      "scoring": "scored",
+      "shown": [
+        "Did I Do It? Habit Tracker 88%",
+        "Streaks 74%",
+        "Calendars: Schedule Planner 50%",
+        "ATracker PRO Time Tracker 49%",
+        "dots: days left widget 48%",
+        "One Hour: Hourly Reminders 37%",
+        "Structured: Daily Planner Todo 36%",
+        "Parchment: Agenda & Daily Note 36%"
+      ]
+    },
+    {
+      "query": "dark mode note app",
+      "embedMs": 434,
+      "jevMs": 1697,
+      "scoring": "scored",
+      "shown": [
+        "Notability: AI Notes & Planner 54%",
+        "Notion: Notes, Tasks, AI 47%",
+        "Runestone Text Editor 40%",
+        "Goodnotes: AI Notes, Docs, PDF 39%",
+        "Granola - AI Meeting Notes 39%",
+        "HarkNote 38%",
+        "Evernote: AI Notes & Notebook 37%",
+        "Google Keep - Notes and lists 35%"
+      ]
+    },
+    {
+      "query": "envelope budget planner",
+      "embedMs": 906,
+      "jevMs": 1152,
+      "scoring": "scored",
+      "shown": [
+        "Budget Bestie 92%",
+        "YNAB 89%",
+        "Goodbudget Budget Planner 82%",
+        "Happy Buckets - Budget planner 61%",
+        "Budget app - spending tracker 54%",
+        "EveryDollar: Budget Management 53%",
+        "Money Manager Budget Planner 48%",
+        "Cashtra -  Budget Tracker 45%"
+      ]
+    },
+    {
+      "query": "live flight tracker",
+      "embedMs": 682,
+      "jevMs": 1061,
+      "scoring": "scored",
+      "shown": [
+        "Flightradar24 | Flight Tracker 98%",
+        "Flight Tracker: Plane Radar 24 97%",
+        "Planes Live - Flight Tracker 97%",
+        "Plane Finder ⁃ Flight Tracker 97%",
+        "AirNav Radar – Flight Tracker 97%",
+        "Flighty – Live Flight Tracker 97%",
+        "FlightAware Flight Tracker 97%",
+        "Flightview - Flight Tracker 97%"
+      ]
+    },
+    {
+      "query": "chromatic guitar tuner",
+      "embedMs": 456,
+      "jevMs": 1015,
+      "scoring": "scored",
+      "shown": [
+        "insTuner - Chromatic Tuner with Tone Generator 97%",
+        "Tuner by Piascore 94%",
+        "Pano Tuner – Chromatic Tuner 93%",
+        "Tuner T1 Pro 92%",
+        "Tunable – Tuner & Metronome 91%",
+        "Tonic - Tuner and Music Theory 89%",
+        "Fender Tune: Guitar Tuner App 87%",
+        "Cleartune 86%"
+      ]
+    },
+    {
+      "query": "baby first foods",
+      "embedMs": 528,
+      "jevMs": 964,
+      "scoring": "scored",
+      "shown": [
+        "Solid Starts: Baby First Foods 97%",
+        "BabyPlate: Starting Solids 95%",
+        "Annabel Karmel Kids Recipes 93%",
+        "101 before one 92%",
+        "BLW Meals: Starting Solids 92%",
+        "Baby Led Weaning Recipes 91%",
+        "Baby Led Kitchen 88%",
+        "My Fussy Eater 52%"
+      ]
+    },
+    {
+      "query": "offline bible reading",
+      "embedMs": 576,
+      "jevMs": 1062,
+      "scoring": "scored",
+      "shown": [
+        "You Version Bible App 96%",
+        "KJV Bible Now: Read & Study 95%",
+        "Verse Bible 95%",
+        "NKJV Bible (Audio & Book) 95%",
+        "Bible Offline - KJV Holy Bible 95%",
+        "NRSV Bible (Audio & Book) 95%",
+        "iMissal Catholic Bible 94%",
+        "NIV Bible (Audio & Book) 94%"
+      ]
+    },
+    {
+      "query": "ssh client for a phone",
+      "embedMs": 506,
+      "jevMs": 1180,
+      "scoring": "scored",
+      "shown": [
+        "Termius - Modern SSH Client 97%",
+        "Terminal# 97%",
+        "SSH Client - Secure ShellFish 97%",
+        "Echo - SSH + Mosh Client 97%",
+        "Termiux 96%",
+        "Easy SSH 96%",
+        "SSH Client - Terminal & Termux 95%",
+        "OpenTerm 94%"
+      ]
+    },
+    {
+      "query": "period and cycle tracker",
+      "embedMs": 672,
+      "jevMs": 1691,
+      "scoring": "scored",
+      "shown": [
+        "Clue Period & Cycle Tracker 98%",
+        "Flo Cycle & Period Tracker 98%",
+        "Period Tracker Period Calendar 97%",
+        "Stardust Period Tracker 97%",
+        "Lively - Period Tracker, Cycle 96%",
+        "Premom-Ovulation Tracker, PCOS 93%",
+        "Natural Cycles: Fertility App 69%"
+      ]
+    },
+    {
+      "query": "hunting trail maps",
+      "embedMs": 391,
+      "jevMs": 1284,
+      "scoring": "scored",
+      "shown": [
+        "onX Hunt: GPS Hunting Maps 96%",
+        "BaseMap: 3D Hunting Maps & GPS 95%",
+        "HuntStand: GPS Maps & Tools 94%",
+        "Spartan Forge: Hunt 91%",
+        "GOHUNT: Research & Maps 90%",
+        "Avenza Maps: Offline Mapping 83%",
+        "Topo Maps+: Topographic Maps 79%",
+        "Track N Trail - Hunting & Maps 77%"
+      ]
+    },
+    {
+      "query": "green owl mascot icon",
+      "embedMs": 170,
+      "jevMs": 1845,
+      "scoring": "scored",
+      "shown": [
+        "Gus on the Go: Spanish 56%",
+        "Duolingo: Language Lessons 48%",
+        "ASL Otty: Signs Language Learn 39%",
+        "BetterAppIcons 32%"
+      ]
+    },
+    {
+      "query": "yellow bird logo",
+      "embedMs": 458,
+      "jevMs": 1996,
+      "scoring": "scored",
+      "shown": [
+        "Birdify for Twitter / X 54%",
+        "Parental Control BrightCanary 50%",
+        "Flightview - Flight Tracker 46%",
+        "VPN - FREE VPN Fast Ⓡ 46%",
+        "Sibley Birds 2nd Edition 44%",
+        "Lufthansa 42%",
+        "Yandex Go: Taxi Food Delivery 38%",
+        "Buffalo Wild Wings 37%"
+      ]
+    },
+    {
+      "query": "icon that says paypal",
+      "embedMs": 366,
+      "jevMs": 2144,
+      "scoring": "scored",
+      "shown": [
+        "PayPal - Pay, Send, Save 95%",
+        "Eureka: Earn money for surveys 39%",
+        "App Icon Extractor 36%"
+      ]
     }
   ]
 }

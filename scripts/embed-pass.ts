@@ -6,14 +6,26 @@ import {
   BGE_DIMS,
   BGE_METHOD,
   BGE_MODEL,
-  CLIP_DIMS,
-  CLIP_METHOD,
-  CLIP_MODEL,
+  SIGLIP_DIMS,
+  SIGLIP_METHOD,
+  SIGLIP_MODEL,
   embedDescriptions,
-  embedIconUrl,
+  embedIconImage,
   encodeVector,
   hashSource,
 } from "../lib/pipeline/embed";
+
+import { colorWords } from "../lib/pipeline/colors";
+
+import { COLOR_METHOD } from "../lib/pipeline/colors";
+
+import {
+  LETTER_METHOD,
+  openLetterReader,
+  readIconLetters,
+} from "../lib/pipeline/letters";
+
+import { load_image } from "@huggingface/transformers";
 
 import {
   dropAppTag,
@@ -21,6 +33,7 @@ import {
   listTextHashes,
   openCatalog,
   upsertIconEmbeddings,
+  upsertIconSignals,
   upsertTextEmbeddings,
 } from "../lib/scrape/store";
 
@@ -33,8 +46,6 @@ type AppRow = {
 };
 
 const TEXT_BATCH = 8;
-
-const ICON_CONCURRENCY = 8;
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -96,7 +107,13 @@ async function main(): Promise<void> {
 
     const hash = hashSource(app.iconUrl);
 
-    return iconHashes.get(app.trackId) !== hash;
+    const stored = iconHashes.get(app.trackId);
+
+    return (
+      !stored
+      || stored.sourceHash !== hash
+      || stored.model !== SIGLIP_MODEL
+    );
   });
 
   console.log(
@@ -166,67 +183,105 @@ async function main(): Promise<void> {
     );
   }
 
-  for (
-    let index = 0;
-    index < iconWork.length;
-    index += ICON_CONCURRENCY
-  ) {
-    const batch = iconWork.slice(
-      index,
-      index + ICON_CONCURRENCY,
-    );
+  const readers = await Promise.all(
+    [0, 1, 2].map(() => openLetterReader()),
+  );
 
-    const now = new Date().toISOString();
+  const signalMethod = `${COLOR_METHOD}+${LETTER_METHOD}`;
 
-    const rows = await Promise.all(
-      batch.map(async (app) => {
-        const vector = await embedIconUrl(
-          app.iconUrl,
-        );
-
-        if (vector.length !== CLIP_DIMS) {
-          throw new Error(
-            `icon dims ${vector.length}`,
-          );
-        }
-
-        if (
-          !vector.every(Number.isFinite)
-          || vector.every((value) => value === 0)
-        ) {
-          throw new Error(
-            `icon vector bad ${app.trackId}`,
-          );
-        }
-
-        return {
-          trackId: app.trackId,
-          method: CLIP_METHOD,
-          model: CLIP_MODEL,
-          sourceHash: hashSource(app.iconUrl),
-          dims: CLIP_DIMS,
-          vector: encodeVector(vector),
-          embeddedAt: now,
-        };
-      }),
-    );
-
-    upsertIconEmbeddings(db, rows);
-
-    const done = Math.min(
-      index + ICON_CONCURRENCY,
-      iconWork.length,
-    );
-
-    if (
-      done === iconWork.length
-      || done % 10 === 0
-      || done <= ICON_CONCURRENCY
+  try {
+    for (
+      let index = 0;
+      index < iconWork.length;
+      index += readers.length
     ) {
-      console.log(
-        `icon ${done}/${iconWork.length}`,
+      const batch = iconWork.slice(
+        index,
+        index + readers.length,
       );
+
+      const prepared = await Promise.all(
+        batch.map(async (app, offset) => {
+          const image = await load_image(app.iconUrl);
+
+          const vector = await embedIconImage(image);
+
+          if (vector.length !== SIGLIP_DIMS) {
+            throw new Error(
+              `icon dims ${vector.length}`,
+            );
+          }
+
+          if (
+            !vector.every(Number.isFinite)
+            || vector.every((value) => value === 0)
+          ) {
+            throw new Error(
+              `icon vector bad ${app.trackId}`,
+            );
+          }
+
+          const colors = colorWords(image);
+
+          const letters = await readIconLetters(
+            readers[offset]!,
+            image,
+          );
+
+          return {
+            app,
+            vector,
+            colors,
+            letters,
+          };
+        }),
+      );
+
+      const now = new Date().toISOString();
+
+      upsertIconEmbeddings(
+        db,
+        prepared.map((row) => ({
+          trackId: row.app.trackId,
+          method: SIGLIP_METHOD,
+          model: SIGLIP_MODEL,
+          sourceHash: hashSource(row.app.iconUrl),
+          dims: SIGLIP_DIMS,
+          vector: encodeVector(row.vector),
+          embeddedAt: now,
+        })),
+      );
+
+      upsertIconSignals(
+        db,
+        prepared.map((row) => ({
+          trackId: row.app.trackId,
+          method: signalMethod,
+          colorText: row.colors.colorText,
+          colors: row.colors.colors,
+          letters: row.letters,
+        })),
+      );
+
+      const done = Math.min(
+        index + readers.length,
+        iconWork.length,
+      );
+
+      if (
+        done === iconWork.length
+        || done % 24 === 0
+        || done <= readers.length
+      ) {
+        console.log(
+          `icon ${done}/${iconWork.length}`,
+        );
+      }
     }
+  } finally {
+    await Promise.all(
+      readers.map((reader) => reader.terminate()),
+    );
   }
 
   const textCount = count(db, "text_embeddings");

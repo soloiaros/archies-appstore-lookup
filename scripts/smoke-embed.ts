@@ -1,6 +1,6 @@
 import {
   BGE_DIMS,
-  CLIP_DIMS,
+  SIGLIP_DIMS,
   embedDescriptions,
   embedIconUrl,
 } from "../lib/pipeline/embed";
@@ -46,14 +46,14 @@ async function main(): Promise<void> {
     iconNorm: Math.hypot(...icon),
     iconNonZero: [...icon].some((value) => value !== 0),
     expectText: BGE_DIMS,
-    expectIcon: CLIP_DIMS,
+    expectIcon: SIGLIP_DIMS,
   };
 
   console.log(JSON.stringify(report, null, 2));
 
   const ok =
     text.length === BGE_DIMS
-    && icon.length === CLIP_DIMS
+    && icon.length === SIGLIP_DIMS
     && report.textFinite
     && report.iconFinite
     && report.textNonZero
