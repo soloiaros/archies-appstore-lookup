@@ -5,6 +5,8 @@ import {
   TitleMorph,
 } from "@/components/AppCard";
 
+import { OutputPanel } from "@/components/OutputPanel";
+
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import { useStaleness } from "@/hooks/useStaleness";
@@ -38,10 +40,7 @@ export function FactualCard({
   const downloads = app?.downloads ?? unavailable();
 
   return (
-    <article
-      className="panel"
-      data-shape="factual"
-    >
+    <OutputPanel data-shape="factual">
       {app ? (
         <IconMorph trackId={app.trackId}>
           <button
@@ -160,6 +159,6 @@ export function FactualCard({
           </a>
         </p>
       ) : null}
-    </article>
+    </OutputPanel>
   );
 }

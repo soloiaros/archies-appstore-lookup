@@ -27,6 +27,8 @@ import {
 
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
+import { NoticeSurface } from "@/components/NoticeSurface";
+
 import { SearchComposer } from "@/components/SearchComposer";
 
 import { StoreMark } from "@/components/ui/StoreMark";
@@ -483,10 +485,7 @@ export function QueryScreen({
             </div>
 
             {notice ? (
-              <div
-                role="alert"
-                className="rise notice-float"
-              >
+              <NoticeSurface role="alert">
                 <p>{notice.message}</p>
 
                 {notice.retry ? (
@@ -500,7 +499,7 @@ export function QueryScreen({
                     ↻
                   </button>
                 ) : null}
-              </div>
+              </NoticeSurface>
             ) : null}
 
             {state.phase === "done"

@@ -1,3 +1,5 @@
+import { OutputPanel } from "@/components/OutputPanel";
+
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import type { ComparativeRow } from "@/lib/types";
@@ -13,7 +15,7 @@ export function ComparativeList({
   tier: ProvenanceTier;
 }) {
   return (
-    <section className="panel" data-shape="comparative">
+    <OutputPanel data-shape="comparative">
       <h2>
         Comparison
         {" "}
@@ -54,6 +56,6 @@ export function ComparativeList({
           ))}
         </ol>
       )}
-    </section>
+    </OutputPanel>
   );
 }
