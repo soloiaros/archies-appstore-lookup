@@ -1,6 +1,9 @@
 "use client";
 
-import { IconMorph } from "@/components/AppCard";
+import {
+  IconMorph,
+  TitleMorph,
+} from "@/components/AppCard";
 
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
@@ -16,7 +19,6 @@ export function FactualCard({
   query,
   app,
   tier,
-  lifted = false,
   onOpen,
 }: {
   query: string;
@@ -25,21 +27,7 @@ export function FactualCard({
 
   tier: ProvenanceTier;
 
-  lifted?: boolean;
-
-  onOpen?: (origin: {
-    x: number;
-
-    y: number;
-
-    side: number;
-
-    src: string;
-
-    trackId: number;
-
-    probability: number | null;
-  }) => void;
+  onOpen?: (trackId: number) => void;
 }) {
   const stale = useStaleness(
     app?.metadataFetchedAt ?? null,
@@ -54,28 +42,13 @@ export function FactualCard({
       className="panel"
       data-shape="factual"
     >
-      {app && !lifted ? (
+      {app ? (
         <IconMorph trackId={app.trackId}>
           <button
             type="button"
             className="factual-icon"
-            onClick={(event) => {
-              if (!onOpen) {
-                return;
-              }
-
-              const rect = (
-                event.currentTarget as HTMLButtonElement
-              ).getBoundingClientRect();
-
-              onOpen({
-                x: rect.left,
-                y: rect.top,
-                side: rect.width,
-                src: app.iconUrl,
-                trackId: app.trackId,
-                probability: null,
-              });
+            onClick={() => {
+              onOpen?.(app.trackId);
             }}
           >
             <img
@@ -86,18 +59,21 @@ export function FactualCard({
         </IconMorph>
       ) : null}
 
-      {app && lifted ? (
-        <div
-          className="factual-icon factual-icon-spacer"
-          aria-hidden
-        />
-      ) : null}
-
-      <h2>
-        {app?.name ?? query}
-        {" "}
-        <ProvenanceMark tier={tier} />
-      </h2>
+      {app ? (
+        <TitleMorph trackId={app.trackId}>
+          <h2>
+            {app.name}
+            {" "}
+            <ProvenanceMark tier={tier} />
+          </h2>
+        </TitleMorph>
+      ) : (
+        <h2>
+          {query}
+          {" "}
+          <ProvenanceMark tier={tier} />
+        </h2>
+      )}
 
       {app ? (
         <p className="clamp">{app.description}</p>

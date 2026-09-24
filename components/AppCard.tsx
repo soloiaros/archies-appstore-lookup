@@ -8,14 +8,20 @@ import {
 
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
-import type { AppDetail } from "@/lib/catalog/detail";
+import { DirectionalPage } from "@/components/DirectionalPage";
 
-import type { MatchPick } from "@/components/floor/overlays";
+import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
 
 export function iconTransitionName(
   trackId: number,
 ) {
   return `app-icon-${trackId}`;
+}
+
+export function titleTransitionName(
+  trackId: number,
+) {
+  return `app-title-${trackId}`;
 }
 
 export function IconMorph({
@@ -33,9 +39,6 @@ export function IconMorph({
     <ViewTransition
       name={iconTransitionName(trackId)}
       share="morph"
-      enter="none"
-      exit="none"
-      update="none"
       default="none"
       onShare={
         onSettled
@@ -48,26 +51,31 @@ export function IconMorph({
   );
 }
 
-type Origin = {
-  x: number;
-
-  y: number;
-
-  side: number;
-
-  src: string;
-
+export function TitleMorph({
+  trackId,
+  children,
+}: {
   trackId: number;
 
-  probability: number | null;
-};
+  children: ReactElement;
+}) {
+  return (
+    <ViewTransition
+      name={titleTransitionName(trackId)}
+      share="text-morph"
+      default="none"
+    >
+      {children}
+    </ViewTransition>
+  );
+}
 
 export function AppDetail({
   detail,
   onBack,
   onFlightEnd,
 }: {
-  detail: AppDetail;
+  detail: AppRecord;
 
   onBack: () => void;
 
@@ -88,70 +96,69 @@ export function AppDetail({
   }, [onBack]);
 
   return (
-    <div
-      className="app-detail"
-      style={{
-        viewTransitionName: "detail-page",
-        viewTransitionClass: "detail-layer",
-      }}
-    >
-      <button
-        type="button"
-        className="app-detail-back"
-        onClick={onBack}
-      >
-        ← Search
-      </button>
-
-      <div className="app-detail-hero-wrap">
-        <IconMorph
-          trackId={detail.trackId}
-          onSettled={onFlightEnd}
+    <DirectionalPage>
+      <div className="app-detail">
+        <button
+          type="button"
+          className="app-detail-back"
+          onClick={onBack}
+          style={{ viewTransitionName: "detail-back" }}
         >
-          <img
-            className="app-detail-hero"
-            src={detail.iconUrl}
-            alt=""
-            draggable={false}
-          />
-        </IconMorph>
+          ← Search
+        </button>
+
+        <div className="app-detail-hero-wrap">
+          <IconMorph
+            trackId={detail.trackId}
+            onSettled={onFlightEnd}
+          >
+            <img
+              className="app-detail-hero"
+              src={detail.iconUrl}
+              alt=""
+              draggable={false}
+            />
+          </IconMorph>
+        </div>
+
+        <div className="app-detail-copy">
+          <TitleMorph trackId={detail.trackId}>
+            <h1>
+              {detail.name}
+              {" "}
+              <ProvenanceMark tier={detail.tier} />
+            </h1>
+          </TitleMorph>
+
+          <p className="app-detail-mono">
+            {detail.sellerName}
+          </p>
+
+          <p className="app-detail-meta">
+            {detail.primaryGenre}
+            {" · "}
+            {detail.formattedPrice}
+
+            {detail.matchProbability !== null ? (
+              <>
+                {" · "}
+                {Math.round(detail.matchProbability * 100)}
+                %
+              </>
+            ) : null}
+          </p>
+
+          <DetailFields detail={detail} />
+        </div>
       </div>
-
-      <div className="app-detail-copy">
-        <h1>
-          {detail.name}
-          {" "}
-          <ProvenanceMark tier={detail.tier} />
-        </h1>
-
-        <p className="app-detail-mono">
-          {detail.sellerName}
-        </p>
-
-        <p className="app-detail-meta">
-          {detail.primaryGenre}
-          {" · "}
-          {detail.formattedPrice}
-
-          {detail.matchProbability !== null ? (
-            <>
-              {" · "}
-              {Math.round(detail.matchProbability * 100)}
-              %
-            </>
-          ) : null}
-        </p>
-
-        <DetailFields detail={detail} />
-      </div>
-    </div>
+    </DirectionalPage>
   );
 }
 
 function DetailFields({
   detail,
 }: {
-  detail: AppDetail;
+  detail: AppRecord;
 }) {
   return (
     <dl className="app-card-fields">
@@ -372,17 +379,4 @@ function formatDate(
       day: "numeric",
     },
   );
-}
-
-export function originFromPick(
-  pick: MatchPick,
-): Origin {
-  return {
-    x: pick.x,
-    y: pick.y,
-    side: pick.side,
-    src: pick.match.src,
-    trackId: pick.match.trackId,
-    probability: pick.match.probability,
-  };
 }

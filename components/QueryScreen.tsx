@@ -3,7 +3,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -12,13 +11,11 @@ import {
 
 import { addTransitionType } from "react";
 
-import {
-  AppDetail,
-  IconMorph,
-  originFromPick,
-} from "@/components/AppCard";
+import { AppDetail } from "@/components/AppCard";
 
 import { ComparativeList } from "@/components/ComparativeList";
+
+import { SearchPage } from "@/components/DirectionalPage";
 
 import { FactualCard } from "@/components/FactualCard";
 
@@ -83,10 +80,6 @@ export function QueryScreen({
     AppRecord | null
   >(null);
 
-  const [lift, setLift] = useState<ReturnType<
-    typeof originFromPick
-  > | null>(null);
-
   const detailRef = useRef(detail);
 
   detailRef.current = detail;
@@ -94,8 +87,6 @@ export function QueryScreen({
   const ready = useRef(
     new Map<number, AppRecord>(),
   );
-
-  const pending = useRef<AppRecord | null>(null);
 
   const [, startTransition] = useTransition();
 
@@ -206,9 +197,7 @@ export function QueryScreen({
         floor.current?.release();
       }
 
-      setLift(null);
       setDetail(null);
-      pending.current = null;
       floor.current?.ghost(null);
       setText(value);
 
@@ -279,7 +268,6 @@ export function QueryScreen({
     (next: AppRecord) => {
       startTransition(() => {
         addTransitionType("nav-forward");
-        setLift(null);
         setDetail(next);
       });
     },
@@ -289,61 +277,55 @@ export function QueryScreen({
   const closeDetail = useCallback(() => {
     startTransition(() => {
       addTransitionType("nav-back");
-      setLift(null);
       setDetail(null);
     });
   }, []);
 
-  const onSeat = useCallback(
-    (seat: Seat) => {
-      void (async () => {
-        const next = await loadDetail(
-          seat.trackId,
-          seat.probability,
-        );
+  const openById = useCallback(
+    async (
+      trackId: number,
+      probability: number | null,
+      ghostSrc?: string,
+    ) => {
+      const next = await loadDetail(
+        trackId,
+        probability,
+      );
 
-        if (!next) {
-          return;
-        }
+      if (!next) {
+        return;
+      }
 
-        floor.current?.ghost(seat.src);
-        showDetail(next);
-      })();
+      if (ghostSrc) {
+        floor.current?.ghost(ghostSrc);
+      }
+
+      showDetail(next);
     },
     [loadDetail, showDetail],
   );
 
-  const onMatchOpen = useCallback(
-    (pick: MatchPick) => {
-      void (async () => {
-        const next = await loadDetail(
-          pick.match.trackId,
-          pick.match.probability,
-        );
-
-        if (!next) {
-          return;
-        }
-
-        floor.current?.ghost(pick.match.src);
-        pending.current = next;
-        setLift(originFromPick(pick));
-      })();
+  const onSeat = useCallback(
+    (seat: Seat) => {
+      void openById(
+        seat.trackId,
+        seat.probability,
+        seat.src,
+      );
     },
-    [loadDetail],
+    [openById],
   );
 
-  useLayoutEffect(() => {
-    if (!lift || detail || !pending.current) {
-      return;
-    }
-
-    const next = pending.current;
-
-    pending.current = null;
-
-    showDetail(next);
-  }, [lift, detail, showDetail]);
+  const onMatchOpen = useCallback(
+    (pick: MatchPick) => {
+      void openById(
+        pick.match.trackId,
+        pick.match.probability,
+        pick.match.src,
+      );
+    },
+    [openById],
+  );
 
   useEffect(() => {
     if (detail) {
@@ -462,128 +444,93 @@ export function QueryScreen({
           onBack={closeDetail}
         />
       ) : (
-      <main
-        className="stage-layer"
-        style={{
-          viewTransitionName: "search-page",
-          viewTransitionClass: "search-layer",
-        }}
-      >
-        <div
-          ref={bar}
-          className="stage-bar"
-        >
-          <SearchComposer
-            value={text}
-            onChange={onType}
-            onSubmit={submit}
-            onClear={() => {
-              reset();
-              setText("");
-              setLift(null);
-              setDetail(null);
-              pending.current = null;
-              floor.current?.ghost(null);
-            }}
-            busy={busy}
-          />
-
-          <div className="indexed-line">
-            <StoreMark size={13} />
-            <span>
-              {indexed.toLocaleString()}
-              {" "}
-              apps indexed
-            </span>
-          </div>
-
-          {discoveryTier
-          && matches.length > 0 ? (
-            <p className="discovery-tier">
-              <ProvenanceMark
-                tier={discoveryTier}
-              />
-            </p>
-          ) : null}
-        </div>
-
-        {notice ? (
-          <div
-            role="alert"
-            className="rise notice-float"
-          >
-            <p>{notice.message}</p>
-
-            {notice.retry ? (
-              <button
-                type="button"
-                aria-label="Try again"
-                onClick={() => {
-                  void run(notice.retry!);
+        <SearchPage>
+          <main className="stage-layer">
+            <div
+              ref={bar}
+              className="stage-bar"
+            >
+              <SearchComposer
+                value={text}
+                onChange={onType}
+                onSubmit={submit}
+                onClear={() => {
+                  reset();
+                  setText("");
+                  setDetail(null);
+                  floor.current?.ghost(null);
                 }}
+                busy={busy}
+              />
+
+              <div className="indexed-line">
+                <StoreMark size={13} />
+                <span>
+                  {indexed.toLocaleString()}
+                  {" "}
+                  apps indexed
+                </span>
+              </div>
+
+              {discoveryTier
+              && matches.length > 0 ? (
+                <p className="discovery-tier">
+                  <ProvenanceMark
+                    tier={discoveryTier}
+                  />
+                </p>
+              ) : null}
+            </div>
+
+            {notice ? (
+              <div
+                role="alert"
+                className="rise notice-float"
               >
-                ↻
-              </button>
+                <p>{notice.message}</p>
+
+                {notice.retry ? (
+                  <button
+                    type="button"
+                    aria-label="Try again"
+                    onClick={() => {
+                      void run(notice.retry!);
+                    }}
+                  >
+                    ↻
+                  </button>
+                ) : null}
+              </div>
             ) : null}
-          </div>
-        ) : null}
 
-        {state.phase === "done"
-        && route === "factual"
-        && state.answer.shape === "factual" ? (
-          <div className="answer-float">
-            <FactualCard
-              query={state.answer.query}
-              app={state.answer.app}
-              tier={state.answer.tier}
-              lifted={false}
-              onOpen={(origin) => {
-                void (async () => {
-                  const next = await loadDetail(
-                    origin.trackId,
-                    null,
-                  );
+            {state.phase === "done"
+            && route === "factual"
+            && state.answer.shape === "factual" ? (
+              <div className="answer-float">
+                <FactualCard
+                  query={state.answer.query}
+                  app={state.answer.app}
+                  tier={state.answer.tier}
+                  onOpen={(trackId) => {
+                    void openById(trackId, null);
+                  }}
+                />
+              </div>
+            ) : null}
 
-                  if (!next) {
-                    return;
-                  }
-
-                  showDetail(next);
-                })();
-              }}
-            />
-          </div>
-        ) : null}
-
-        {state.phase === "done"
-        && route === "comparative"
-        && state.answer.shape === "comparative" ? (
-          <div className="answer-float">
-            <ComparativeList
-              rows={state.answer.rows}
-              tier={state.answer.tier}
-            />
-          </div>
-        ) : null}
-      </main>
+            {state.phase === "done"
+            && route === "comparative"
+            && state.answer.shape === "comparative" ? (
+              <div className="answer-float">
+                <ComparativeList
+                  rows={state.answer.rows}
+                  tier={state.answer.tier}
+                />
+              </div>
+            ) : null}
+          </main>
+        </SearchPage>
       )}
-
-      {lift && !detail ? (
-        <IconMorph trackId={lift.trackId}>
-          <img
-            className="icon-lift"
-            src={lift.src}
-            alt=""
-            draggable={false}
-            style={{
-              left: lift.x,
-              top: lift.y,
-              width: lift.side,
-              height: lift.side,
-            }}
-          />
-        </IconMorph>
-      ) : null}
     </>
   );
 }
