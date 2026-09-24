@@ -19,19 +19,28 @@
     "validate:index": "tsx scripts/validate-index.ts",
     "test:jev": "tsx scripts/test-jev-mock.ts",
     "test:staleness": "tsx scripts/test-staleness.ts",
-    "exercise:query": "tsx scripts/exercise-query.ts"
+    "exercise:query": "tsx scripts/exercise-query.ts",
+    "atlas": "node scripts/build-atlas.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
+    "border-beam": "^1.4.1",
+    "geist": "^1.7.2",
+    "matter-js": "^0.20.0",
     "next": "^16.3.6",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "thinking-orbs": "^0.3.2"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/matter-js": "^0.20.2",
     "@types/node": "^20.19.43",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3"
   }
