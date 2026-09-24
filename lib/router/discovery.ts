@@ -28,7 +28,7 @@ export async function answerDiscovery(
       scoring: "unavailable",
       scoringNote:
         scored.reason
-        ?? "Scoring needs TYPE_SAFE_KEY.",
+        ?? "Scoring needs an OpenRouter key.",
       finalistCount: finalists.length,
       hits: [],
     };
