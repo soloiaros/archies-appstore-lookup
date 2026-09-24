@@ -14,12 +14,27 @@ export function FactualCard({
   query,
   app,
   tier,
+  onOpen,
 }: {
   query: string;
 
   app: FactualApp | null;
 
   tier: ProvenanceTier;
+
+  onOpen?: (origin: {
+    x: number;
+
+    y: number;
+
+    side: number;
+
+    src: string;
+
+    trackId: number;
+
+    probability: number | null;
+  }) => void;
 }) {
   const stale = useStaleness(
     app?.metadataFetchedAt ?? null,
@@ -30,12 +45,38 @@ export function FactualCard({
   const downloads = app?.downloads ?? unavailable();
 
   return (
-    <article className="panel" data-shape="factual">
+    <article
+      className="panel"
+      data-shape="factual"
+    >
       {app ? (
-        <img
-          src={app.iconUrl}
-          alt=""
-        />
+        <button
+          type="button"
+          className="factual-icon"
+          onClick={(event) => {
+            if (!onOpen) {
+              return;
+            }
+
+            const rect = (
+              event.currentTarget as HTMLButtonElement
+            ).getBoundingClientRect();
+
+            onOpen({
+              x: rect.left,
+              y: rect.top,
+              side: rect.width,
+              src: app.iconUrl,
+              trackId: app.trackId,
+              probability: null,
+            });
+          }}
+        >
+          <img
+            src={app.iconUrl}
+            alt=""
+          />
+        </button>
       ) : null}
 
       <h2>
@@ -116,6 +157,18 @@ export function FactualCard({
 
       {stale ? (
         <p>Metadata is stale.</p>
+      ) : null}
+
+      {app?.storeUrl ? (
+        <p>
+          <a
+            href={app.storeUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            App Store
+          </a>
+        </p>
       ) : null}
     </article>
   );
