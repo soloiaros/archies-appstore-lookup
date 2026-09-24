@@ -491,98 +491,80 @@ ol {
   opacity: 1;
 }
 
-.app-card-root {
+.app-detail {
   position: fixed;
   inset: 0;
-  z-index: 40;
-  display: grid;
-  place-items: center;
-  padding: max(0.75rem, env(safe-area-inset-top))
-    0.75rem
-    max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 30;
+  overflow: auto;
+  background: var(--color-ink);
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    1.25rem
+    max(2rem, env(safe-area-inset-bottom));
 }
 
-.app-card-scrim {
-  position: absolute;
-  inset: 0;
+.app-detail-back {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 1rem;
+  padding: 0;
   border: 0;
-  background: rgb(0 0 0 / 0.55);
+  background: transparent;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: -0.01em;
   cursor: pointer;
+  min-height: 44px;
 }
 
-.app-card-panel {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: min(920px, 100%);
-  max-height: min(92vh, 860px);
-  overflow: hidden;
-  border: 1px solid var(--color-line-strong);
+.app-detail-back:hover {
+  color: var(--color-text);
+}
+
+.app-detail-hero-wrap {
+  width: min(45vh, 100%);
+  max-width: 420px;
+  margin: 0 auto 1.5rem;
+}
+
+.app-detail-hero {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   border-radius: 12px;
-  background: var(--color-panel);
-  box-shadow: 0 24px 80px rgb(0 0 0 / 0.45);
+  object-fit: cover;
+}
+
+.app-detail-copy {
+  max-width: 40rem;
+  margin: 0 auto;
+  border-top: 1px solid var(--color-line);
+  padding-top: 1.5rem;
+}
+
+.app-detail-copy h1 {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.app-detail-mono,
+.app-detail-meta {
+  margin: 0.35rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.app-detail-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-faint);
 }
 
 .app-card-fields {
-  margin: 0;
-}
-
-.app-card-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  align-self: flex-start;
-  margin: 0.85rem 0.85rem 0;
-  padding: 0.45rem 0.85rem 0.45rem 0.65rem;
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  background: var(--color-raised);
-  color: var(--color-text);
-  font-size: 13px;
-  letter-spacing: -0.01em;
-  cursor: pointer;
-  min-height: 40px;
-}
-
-.app-card-back:active {
-  transform: scale(0.97);
-}
-
-.app-card-body {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.15fr);
-  gap: 1.25rem;
-  min-height: 0;
-  padding: 0.75rem 1.1rem 1.25rem;
-  overflow: hidden;
-}
-
-.app-card-media {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 0.5rem;
-}
-
-.app-card-icon-slot {
-  width: min(220px, 42vw);
-  aspect-ratio: 1;
-}
-
-.app-card-flyer {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 22.5%;
-  object-fit: cover;
-  box-shadow: 0 12px 40px rgb(0 0 0 / 0.35);
-}
-
-.app-card-meta {
-  min-height: 0;
-  overflow: auto;
-  padding-right: 0.25rem;
+  margin: 1.25rem 0 0;
 }
 
 .app-card-field {
@@ -690,29 +672,17 @@ ol {
     white-space: normal;
   }
 
-  .app-card-root {
-    padding: 0;
-    place-items: stretch;
+  .app-detail {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
-  .app-card-panel {
-    width: 100%;
-    max-height: none;
-    height: 100%;
-    border-radius: 0;
-    border-left: 0;
-    border-right: 0;
+  .app-detail-hero-wrap {
+    width: min(42vh, 100%);
   }
 
-  .app-card-body {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-    overflow: auto;
-    padding: 0.5rem 1rem 1.5rem;
-  }
-
-  .app-card-icon-slot {
-    width: min(148px, 38vw);
+  .app-detail-copy h1 {
+    font-size: 1.5rem;
   }
 
   .app-card-field {
@@ -725,13 +695,51 @@ ol {
   }
 }
 
+@media (min-width: 1025px) {
+  .app-detail-hero-wrap {
+    width: min(60vh, 480px);
+  }
+}
+
 @media (min-width: 721px) and (max-width: 1024px) {
-  .app-card-icon-slot {
-    width: min(180px, 28vw);
+  .app-detail-hero-wrap {
+    width: min(55vh, 420px);
   }
 
   .app-card-field {
     grid-template-columns: 6.5rem minmax(0, 1fr);
+  }
+}
+
+:root {
+  --duration-exit: 150ms;
+  --duration-enter: 210ms;
+  --duration-move: 400ms;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide {
+  from {
+    translate: var(--slide-offset);
+  }
+
+  to {
+    translate: 0;
+  }
+}
+
+@keyframes via-blur {
+  30% {
+    filter: blur(3px);
   }
 }
 
@@ -744,51 +752,64 @@ ol {
   animation: none;
 }
 
-::view-transition-group(.icon-morph) {
-  animation-duration: 520ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-exit) ease-in both fade reverse,
+    var(--duration-move) ease-in-out both slide reverse;
+}
+
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both fade,
+    var(--duration-move) ease-in-out both slide;
+}
+
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-exit) ease-in both fade reverse,
+    var(--duration-move) ease-in-out both slide reverse;
+}
+
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both fade,
+    var(--duration-move) ease-in-out both slide;
+}
+
+::view-transition-group(.morph) {
+  animation-duration: var(--duration-move);
   z-index: 80;
   border-radius: 22.5%;
   overflow: clip;
 }
 
-::view-transition-image-pair(.icon-morph) {
-  animation: none;
+::view-transition-image-pair(.morph) {
+  animation-name: via-blur;
 }
 
-::view-transition-old(.icon-morph) {
-  display: none;
-}
-
-::view-transition-new(.icon-morph) {
+::view-transition-old(.morph),
+::view-transition-new(.morph) {
   animation: none;
   mix-blend-mode: normal;
   height: 100%;
   width: 100%;
-  border-radius: 22.5%;
 }
 
-::view-transition-group(.card-fade) {
+::view-transition-group(detail-back) {
   animation: none;
-  z-index: 40;
+  z-index: 100;
 }
 
-::view-transition-old(.card-fade) {
-  animation: 280ms ease both vt-fade reverse;
+::view-transition-old(detail-back) {
+  display: none;
 }
 
-::view-transition-new(.card-fade) {
-  animation: 420ms var(--ease-premium) both vt-fade;
-}
-
-@keyframes vt-fade {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+::view-transition-new(detail-back) {
+  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -799,10 +820,7 @@ ol {
   .match-tip,
   .match-tip > div,
   .match-tip p,
-  .app-card-scrim,
-  .app-card-panel,
-  .app-card-meta,
-  .app-card-flyer {
+  .app-detail-back {
     transition: none !important;
     animation: none !important;
   }
