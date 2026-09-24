@@ -404,20 +404,33 @@ export function listTextHashes(
   );
 }
 
+export type StoredIcon = {
+  trackId: number;
+
+  sourceHash: string;
+
+  model: string;
+};
+
 export function listIconHashes(
   db: DatabaseSync,
-): Map<number, string> {
+): Map<number, StoredIcon> {
   const rows = db.prepare(`
     select
       track_id as trackId,
-      source_hash as sourceHash
+      source_hash as sourceHash,
+      model
     from icon_embeddings
-  `).all() as StoredHash[];
+  `).all() as StoredIcon[];
 
   return new Map(
     rows.map((row) => [
-      row.trackId,
-      row.sourceHash,
+      Number(row.trackId),
+      {
+        trackId: Number(row.trackId),
+        sourceHash: String(row.sourceHash),
+        model: String(row.model),
+      },
     ]),
   );
 }
@@ -499,6 +512,7 @@ export function upsertIconEmbeddings(
       embedded_at = excluded.embedded_at
     where
       icon_embeddings.source_hash is not excluded.source_hash
+      or icon_embeddings.model is not excluded.model
   `);
 
   db.exec("begin");
@@ -578,6 +592,65 @@ export function replaceScreenshotOcr(
         row.screenshotUrl,
         row.method,
         row.text,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export type IconSignalRow = {
+  trackId: number;
+
+  method: string;
+
+  colorText: string;
+
+  colors: string[];
+
+  letters: string;
+};
+
+export function upsertIconSignals(
+  db: DatabaseSync,
+  rows: IconSignalRow[],
+): void {
+  const write = db.prepare(`
+    insert into icon_signals (
+      track_id,
+      tier,
+      method,
+      color_text,
+      colors,
+      letters
+    ) values (
+      ?, 'estimated', ?, ?, ?, ?
+    )
+    on conflict (track_id) do update set
+      method = excluded.method,
+      color_text = excluded.color_text,
+      colors = excluded.colors,
+      letters = excluded.letters
+    where
+      icon_signals.color_text is not excluded.color_text
+      or icon_signals.letters is not excluded.letters
+      or icon_signals.method is not excluded.method
+  `);
+
+  db.exec("begin");
+
+  try {
+    for (const row of rows) {
+      write.run(
+        row.trackId,
+        row.method,
+        row.colorText,
+        JSON.stringify(row.colors),
+        row.letters,
       );
     }
 
