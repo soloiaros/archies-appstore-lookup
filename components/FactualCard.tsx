@@ -30,7 +30,14 @@ export function FactualCard({
   const downloads = app?.downloads ?? unavailable();
 
   return (
-    <article data-shape="factual">
+    <article className="panel" data-shape="factual">
+      {app ? (
+        <img
+          src={app.iconUrl}
+          alt=""
+        />
+      ) : null}
+
       <h2>
         {app?.name ?? query}
         {" "}
@@ -38,7 +45,7 @@ export function FactualCard({
       </h2>
 
       {app ? (
-        <p>{app.description}</p>
+        <p className="clamp">{app.description}</p>
       ) : (
         <p>Not indexed.</p>
       )}

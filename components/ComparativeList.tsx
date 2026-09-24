@@ -13,7 +13,7 @@ export function ComparativeList({
   tier: ProvenanceTier;
 }) {
   return (
-    <section data-shape="comparative">
+    <section className="panel" data-shape="comparative">
       <h2>
         Comparison
         {" "}

@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import type { DiscoveryHit } from "@/lib/types";
@@ -21,47 +23,62 @@ export function DiscoveryList({
 
   finalistCount: number;
 }) {
-  return (
-    <section data-shape="discovery">
-      <h2>
-        Matches
+  if (scoring === "unavailable") {
+    return (
+      <p className="notice" data-shape="discovery">
+        {scoringNote
+          ?? "Scoring needs an OpenRouter key."}
+        {" "}
+        Retrieved
+        {" "}
+        {finalistCount}
+        {" "}
+        finalists without scores.
         {" "}
         <ProvenanceMark tier={tier} />
-      </h2>
+      </p>
+    );
+  }
 
-      {scoring === "unavailable" ? (
-        <p>
-          {scoringNote
-            ?? "Scoring needs TYPE_SAFE_KEY."}
-          {" "}
-          Retrieved
-          {" "}
-          {finalistCount}
-          {" "}
-          finalists without scores.
-        </p>
-      ) : null}
+  if (hits.length === 0) {
+    return (
+      <p className="notice" data-shape="discovery">
+        No apps cleared the certainty threshold.
+        {" "}
+        <ProvenanceMark tier={tier} />
+      </p>
+    );
+  }
 
-      {scoring === "scored"
-      && hits.length === 0 ? (
-        <p>No apps cleared the certainty threshold.</p>
-      ) : null}
+  return (
+    <div data-shape="discovery">
+      <p className="indexed">
+        <ProvenanceMark tier={tier} />
+      </p>
 
-      {hits.length > 0 ? (
-        <ol>
-          {hits.map((hit) => (
-            <li key={hit.trackId}>
-              <strong>{hit.name}</strong>
+      <div className="matches">
+        {hits.map((hit, index) => (
+          <figure
+            key={hit.trackId}
+            className="match"
+            style={{ "--i": index } as CSSProperties}
+          >
+            <figcaption className="match-label">
+              {Math.round(hit.probability * 100)}
+              %
+            </figcaption>
 
-              <span>
-                {" "}
-                {Math.round(hit.probability * 100)}
-                %
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
-    </section>
+            <img
+              src={hit.iconUrl}
+              alt=""
+            />
+
+            <figcaption className="match-name">
+              {hit.name}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
   );
 }
