@@ -8,12 +8,13 @@ import {
   useRef,
   useState,
   useTransition,
+  ViewTransition,
 } from "react";
 
 import { addTransitionType } from "react";
 
 import {
-  AppCard,
+  AppDetail,
   IconMorph,
   originFromPick,
 } from "@/components/AppCard";
@@ -39,6 +40,8 @@ import type { MatchPick } from "@/components/floor/overlays";
 import type { Sheet } from "@/components/floor/atlas";
 
 import { useQuery } from "@/hooks/useQuery";
+
+import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
 
 import { useRoute } from "@/hooks/useRoute";
 
@@ -77,17 +80,23 @@ export function QueryScreen({
     setFloorAt((n) => n + 1);
   }, []);
 
-  const [card, setCard] = useState<ReturnType<
-    typeof originFromPick
-  > | null>(null);
+  const [detail, setDetail] = useState<
+    AppRecord | null
+  >(null);
 
   const [lift, setLift] = useState<ReturnType<
     typeof originFromPick
   > | null>(null);
 
-  const cardRef = useRef(card);
+  const detailRef = useRef(detail);
 
-  cardRef.current = card;
+  detailRef.current = detail;
+
+  const ready = useRef(
+    new Map<number, AppRecord>(),
+  );
+
+  const pending = useRef<AppRecord | null>(null);
 
   const [, startTransition] = useTransition();
 
@@ -199,7 +208,8 @@ export function QueryScreen({
       }
 
       setLift(null);
-      setCard(null);
+      setDetail(null);
+      pending.current = null;
       floor.current?.ghost(null);
       setText(value);
 
@@ -219,73 +229,125 @@ export function QueryScreen({
   );
 
   const endFlight = useCallback(() => {
-    if (cardRef.current) {
+    if (detailRef.current) {
       return;
     }
 
     floor.current?.ghost(null);
   }, []);
 
-  const openCard = useCallback(
-    (
-      origin: ReturnType<typeof originFromPick>,
+  const loadDetail = useCallback(
+    async (
+      trackId: number,
+      probability: number | null,
     ) => {
+      const cached = ready.current.get(trackId);
+
+      if (cached) {
+        return cached;
+      }
+
+      const query =
+        probability === null
+          ? ""
+          : `?p=${probability}`;
+
+      const response = await fetch(
+        `/api/app/${trackId}${query}`,
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json() as AppRecord;
+
+      if (
+        !data
+        || data.trackId !== trackId
+      ) {
+        return null;
+      }
+
+      ready.current.set(trackId, data);
+
+      return data;
+    },
+    [],
+  );
+
+  const showDetail = useCallback(
+    (next: AppRecord) => {
       startTransition(() => {
-        addTransitionType("card");
-        setCard(origin);
+        addTransitionType("nav-forward");
+        setLift(null);
+        setDetail(next);
       });
     },
     [],
   );
 
-  const closeCard = useCallback(() => {
+  const closeDetail = useCallback(() => {
     startTransition(() => {
-      addTransitionType("card");
+      addTransitionType("nav-back");
       setLift(null);
-      setCard(null);
+      setDetail(null);
     });
   }, []);
 
   const onSeat = useCallback(
     (seat: Seat) => {
-      floor.current?.ghost(seat.src);
+      void (async () => {
+        const next = await loadDetail(
+          seat.trackId,
+          seat.probability,
+        );
 
-      openCard({
-        x: seat.left,
-        y: seat.top,
-        side: seat.side,
-        src: seat.src,
-        trackId: seat.trackId,
-        probability: seat.probability,
-      });
+        if (!next) {
+          return;
+        }
+
+        floor.current?.ghost(seat.src);
+        showDetail(next);
+      })();
     },
-    [openCard],
+    [loadDetail, showDetail],
   );
 
   const onMatchOpen = useCallback(
     (pick: MatchPick) => {
-      floor.current?.ghost(pick.match.src);
-      setLift(originFromPick(pick));
+      void (async () => {
+        const next = await loadDetail(
+          pick.match.trackId,
+          pick.match.probability,
+        );
+
+        if (!next) {
+          return;
+        }
+
+        floor.current?.ghost(pick.match.src);
+        pending.current = next;
+        setLift(originFromPick(pick));
+      })();
     },
-    [],
+    [loadDetail],
   );
 
   useLayoutEffect(() => {
-    if (!lift || card) {
+    if (!lift || detail || !pending.current) {
       return;
     }
 
-    const origin = lift;
+    const next = pending.current;
 
-    startTransition(() => {
-      addTransitionType("card");
-      setCard(origin);
-      setLift(null);
-    });
-  }, [lift, card]);
+    pending.current = null;
+
+    showDetail(next);
+  }, [lift, detail, showDetail]);
 
   useEffect(() => {
-    if (card) {
+    if (detail) {
       wasOpen.current = true;
 
       return;
@@ -302,7 +364,50 @@ export function QueryScreen({
     return () => {
       window.clearTimeout(id);
     };
-  }, [card]);
+  }, [detail]);
+
+  useEffect(() => {
+    const jobs: {
+      trackId: number;
+
+      probability: number | null;
+    }[] = matches.map((match) => ({
+      trackId: match.trackId,
+      probability: match.probability,
+    }));
+
+    if (
+      state.phase === "done"
+      && state.answer.shape === "factual"
+      && state.answer.app
+    ) {
+      jobs.push({
+        trackId: state.answer.app.trackId,
+        probability: null,
+      });
+    }
+
+    let stop = false;
+
+    for (const job of jobs) {
+      if (ready.current.has(job.trackId)) {
+        continue;
+      }
+
+      void loadDetail(
+        job.trackId,
+        job.probability,
+      ).then((row) => {
+        if (stop || !row) {
+          return;
+        }
+      });
+    }
+
+    return () => {
+      stop = true;
+    };
+  }, [matches, state, loadDetail]);
 
   const discoveryTier =
     state.phase === "done"
@@ -347,10 +452,44 @@ export function QueryScreen({
         apiRef={floor}
         onReady={onFloorReady}
         onMatchOpen={onMatchOpen}
-        openTrackId={card?.trackId ?? null}
+        openTrackId={detail?.trackId ?? null}
         onSeat={onSeat}
       />
 
+      {detail ? (
+        <ViewTransition
+          enter={{
+            "nav-forward": "nav-forward",
+            "nav-back": "nav-back",
+            default: "none",
+          }}
+          exit={{
+            "nav-forward": "nav-forward",
+            "nav-back": "nav-back",
+            default: "none",
+          }}
+          default="none"
+        >
+          <AppDetail
+            detail={detail}
+            onFlightEnd={endFlight}
+            onBack={closeDetail}
+          />
+        </ViewTransition>
+      ) : (
+      <ViewTransition
+        enter={{
+          "nav-forward": "nav-forward",
+          "nav-back": "nav-back",
+          default: "none",
+        }}
+        exit={{
+          "nav-forward": "nav-forward",
+          "nav-back": "nav-back",
+          default: "none",
+        }}
+        default="none"
+      >
       <main className="stage-layer">
         <div
           ref={bar}
@@ -364,7 +503,8 @@ export function QueryScreen({
               reset();
               setText("");
               setLift(null);
-              setCard(null);
+              setDetail(null);
+              pending.current = null;
               floor.current?.ghost(null);
             }}
             busy={busy}
@@ -418,11 +558,20 @@ export function QueryScreen({
               query={state.answer.query}
               app={state.answer.app}
               tier={state.answer.tier}
-              lifted={
-                card?.trackId === state.answer.app?.trackId
-              }
+              lifted={false}
               onOpen={(origin) => {
-                openCard(origin);
+                void (async () => {
+                  const next = await loadDetail(
+                    origin.trackId,
+                    null,
+                  );
+
+                  if (!next) {
+                    return;
+                  }
+
+                  showDetail(next);
+                })();
               }}
             />
           </div>
@@ -439,8 +588,10 @@ export function QueryScreen({
           </div>
         ) : null}
       </main>
+      </ViewTransition>
+      )}
 
-      {lift && !card ? (
+      {lift && !detail ? (
         <IconMorph trackId={lift.trackId}>
           <img
             className="icon-lift"
@@ -455,14 +606,6 @@ export function QueryScreen({
             }}
           />
         </IconMorph>
-      ) : null}
-
-      {card ? (
-        <AppCard
-          origin={card}
-          onFlightEnd={endFlight}
-          onClose={closeCard}
-        />
       ) : null}
     </>
   );

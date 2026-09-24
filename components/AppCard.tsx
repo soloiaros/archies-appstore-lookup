@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useState,
   ViewTransition,
   type ReactElement,
 } from "react";
@@ -33,7 +32,7 @@ export function IconMorph({
   return (
     <ViewTransition
       name={iconTransitionName(trackId)}
-      share="icon-morph"
+      share="morph"
       enter="none"
       exit="none"
       update="none"
@@ -63,73 +62,21 @@ type Origin = {
   probability: number | null;
 };
 
-export function AppCard({
-  origin,
-  onClose,
+export function AppDetail({
+  detail,
+  onBack,
   onFlightEnd,
 }: {
-  origin: Origin;
+  detail: AppDetail;
 
-  onClose: () => void;
+  onBack: () => void;
 
   onFlightEnd?: () => void;
 }) {
-  const [detail, setDetail] = useState<
-    AppDetail | null
-  >(null);
-
-  const [error, setError] = useState<string | null>(
-    null,
-  );
-
-  useEffect(() => {
-    let gone = false;
-
-    void (async () => {
-      try {
-        const query =
-          origin.probability === null
-            ? ""
-            : `?p=${origin.probability}`;
-
-        const response = await fetch(
-          `/api/app/${origin.trackId}${query}`,
-        );
-
-        const data: unknown =
-          await response.json();
-
-        if (gone) {
-          return;
-        }
-
-        if (!response.ok) {
-          setError(
-            isError(data)
-              ? data.error
-              : "Could not load app.",
-          );
-
-          return;
-        }
-
-        setDetail(data as AppDetail);
-      } catch {
-        if (!gone) {
-          setError("Could not load app.");
-        }
-      }
-    })();
-
-    return () => {
-      gone = true;
-    };
-  }, [origin.trackId, origin.probability]);
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onBack();
       }
     };
 
@@ -138,76 +85,61 @@ export function AppCard({
     return () => {
       window.removeEventListener("keydown", onKey);
     };
-  }, [onClose]);
+  }, [onBack]);
 
   return (
-    <ViewTransition
-      enter="card-fade"
-      exit="card-fade"
-      update="none"
-      default="none"
-    >
-      <div
-        className="app-card-root"
-        role="dialog"
-        aria-modal="true"
-        aria-label={detail?.name ?? "App"}
+    <div className="app-detail">
+      <button
+        type="button"
+        className="app-detail-back"
+        style={{ viewTransitionName: "detail-back" }}
+        onClick={onBack}
       >
-        <button
-          type="button"
-          className="app-card-scrim"
-          aria-label="Close"
-          onClick={onClose}
-        />
+        ← Search
+      </button>
 
-        <div className="app-card-panel">
-          <button
-            type="button"
-            className="app-card-back"
-            onClick={onClose}
-          >
-            <span aria-hidden>←</span>
-            Back
-          </button>
+      <div className="app-detail-hero-wrap">
+        <IconMorph
+          trackId={detail.trackId}
+          onSettled={onFlightEnd}
+        >
+          <img
+            className="app-detail-hero"
+            src={detail.iconUrl}
+            alt=""
+            draggable={false}
+          />
+        </IconMorph>
+      </div>
 
-          <div className="app-card-body">
-            <div className="app-card-media">
-              <div className="app-card-icon-slot">
-                <IconMorph
-                  trackId={origin.trackId}
-                  onSettled={onFlightEnd}
-                >
-                  <img
-                    className="app-card-flyer"
-                    src={origin.src}
-                    alt=""
-                    draggable={false}
-                  />
-                </IconMorph>
-              </div>
-            </div>
+      <div className="app-detail-copy">
+        <h1>
+          {detail.name}
+          {" "}
+          <ProvenanceMark tier={detail.tier} />
+        </h1>
 
-            <div className="app-card-meta">
-            {error ? (
-              <p className="app-card-error">
-                {error}
-              </p>
-            ) : null}
+        <p className="app-detail-mono">
+          {detail.sellerName}
+        </p>
 
-            {!detail && !error ? (
-              <p className="app-card-loading">
-                Loading…
-              </p>
-            ) : null}
+        <p className="app-detail-meta">
+          {detail.primaryGenre}
+          {" · "}
+          {detail.formattedPrice}
 
-            {detail ? (
-              <DetailFields detail={detail} />
-            ) : null}
-          </div>
-        </div>
+          {detail.matchProbability !== null ? (
+            <>
+              {" · "}
+              {Math.round(detail.matchProbability * 100)}
+              %
+            </>
+          ) : null}
+        </p>
+
+        <DetailFields detail={detail} />
       </div>
     </div>
-    </ViewTransition>
   );
 }
 
@@ -218,21 +150,6 @@ function DetailFields({
 }) {
   return (
     <dl className="app-card-fields">
-      <Field label="Name">
-        {detail.name}
-        {" "}
-        <ProvenanceMark tier={detail.tier} />
-      </Field>
-
-      {detail.matchProbability !== null ? (
-        <Field label="Match">
-          {Math.round(
-            detail.matchProbability * 100,
-          )}
-          %
-        </Field>
-      ) : null}
-
       <Field label="Seller">
         {detail.sellerName}
       </Field>
@@ -449,19 +366,6 @@ function formatDate(
       month: "short",
       day: "numeric",
     },
-  );
-}
-
-function isError(
-  value: unknown,
-): value is { error: string } {
-  return (
-    typeof value === "object"
-    && value !== null
-    && "error" in value
-    && typeof (
-      value as { error: unknown }
-    ).error === "string"
   );
 }
 
