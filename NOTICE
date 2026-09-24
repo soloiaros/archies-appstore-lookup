@@ -1,0 +1,33 @@
+The MIT license in LICENSE covers the source code in this repository.
+
+This project is derived from aayans-yc-indexor, which is also MIT:
+
+  Copyright (c) 2026 Aayan Ali
+  https://github.com/Aayan-DEV/aayans-yc-indexor
+
+That upstream copyright notice and MIT permission notice must stay with any
+copy or substantial portion of the code that came from that project. The
+search shape (a description in, matching icons out, each with a probability),
+the split between a local shortlist and a Jev scoring call, and the decision
+to show results at or above 30% come from there. This tree retargets that
+shape at the App Store and does not ship the YC company catalog, the YC
+logos, or Apple's MobileCLIP models.
+
+The MIT license does not cover material that other people own. In particular:
+
+- App names, descriptions, icons, prices, ratings, and chart ranks come from
+  Apple's iTunes Lookup API and RSS feeds. They are fetched at build time into
+  data/catalog.sqlite, which is not committed. Redistributing that database or
+  the icons is your problem to clear with Apple, not something this license
+  grants.
+- Description embeddings use BAAI/bge-small-en-v1.5. Icon embeddings use
+  Google's SigLIP2 (onnx-community/siglip2-base-patch16-224-ONNX). Those
+  weights are downloaded when you run the embed pass or the server. They stay
+  under their own licenses.
+- Words read off icons are produced by Tesseract (tesseract.js), Apache-2.0.
+- Scoring calls go to TypeSafe's Jev model through OpenRouter. The key, the
+  account, and the per-request charge are yours. Jev is not part of this
+  repository.
+
+Check those terms yourself before you redistribute a built catalog, a model
+cache, or a hosted copy of the icons.
