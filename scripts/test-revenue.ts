@@ -13,6 +13,16 @@ import {
   spendAtRank,
 } from "../lib/pipeline/revenue";
 
+import {
+  formatRunRate,
+  rollupArr,
+  rollupMrr,
+} from "../lib/catalog/revenue";
+
+import { estimated } from "../lib/provenance/assign";
+
+import { unavailable } from "../lib/provenance/assign";
+
 function assert(
   condition: boolean,
   message: string,
@@ -246,6 +256,98 @@ assert(
 assert(
   JSON.stringify(listEstimates(db)) === snapshot,
   "second run unchanged",
+);
+
+const overallDaily = estimated(
+  {
+    low: overall!.lowUsd!,
+    mid: overall!.midUsd!,
+    high: overall!.highUsd!,
+    basis: "overall-grossing" as const,
+    country: "us",
+    day: "2026-09-23",
+  },
+  overall!.method,
+);
+
+const overallMrr = rollupMrr(overallDaily);
+
+assert(
+  overallMrr.tier === "estimated",
+  "mrr estimated",
+);
+
+assert(
+  overallMrr.tier === "estimated"
+  && overallMrr.method.includes("us-grossing-power-v1")
+  && overallMrr.method.includes("× 30")
+  && overallMrr.method.includes("US store-spend run rate")
+  && !overallMrr.method.toLowerCase().includes("worldwide"),
+  "mrr method",
+);
+
+assert(
+  overallMrr.tier === "estimated"
+  && overallMrr.value.includes("$")
+  && overallMrr.value.includes("–"),
+  "mrr band scaled",
+);
+
+const overallArr = rollupArr(overallDaily);
+
+assert(
+  overallArr.tier === "estimated"
+  && overallArr.method.includes("× 30 × 12"),
+  "arr method",
+);
+
+const belowDaily = estimated(
+  {
+    low: null,
+    mid: null,
+    high: below!.highUsd!,
+    basis: "below-grossing" as const,
+    country: "us",
+    day: "2026-09-23",
+  },
+  below!.method,
+);
+
+const belowMrr = rollupMrr(belowDaily);
+
+assert(
+  belowMrr.tier === "estimated"
+  && belowMrr.value.startsWith("<$"),
+  "mrr ceiling only",
+);
+
+assert(
+  formatRunRate({
+    low: null,
+    mid: null,
+    high: 150_000,
+    basis: "below-grossing",
+    country: "us",
+    day: "2026-09-23",
+  }) === "<$150k",
+  "compact ceiling",
+);
+
+assert(
+  formatRunRate({
+    low: 2_000_000,
+    mid: 2_000_000,
+    high: 2_000_000,
+    basis: "overall-grossing",
+    country: "us",
+    day: "2026-09-23",
+  }) === "$2.0M – $2.0M",
+  "compact millions",
+);
+
+assert(
+  rollupMrr(unavailable()).tier === "unavailable",
+  "mrr unavailable passthrough",
 );
 
 console.log(
