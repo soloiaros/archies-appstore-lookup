@@ -219,11 +219,18 @@ export function SocialLinks() {
           </span>
 
           <span className="locker-handle" aria-hidden>
-            <span className="locker-rose" />
+            <span className="locker-rose">
+              <span className="locker-screw" />
+              <span className="locker-screw" />
+              <span className="locker-keyhole" />
+            </span>
+
             <span className="locker-lever">
               <span className="locker-lever-shade" />
               <span className="locker-lever-body" />
             </span>
+
+            <span className="locker-boss" />
           </span>
         </button>
       </div>
