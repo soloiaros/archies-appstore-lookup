@@ -2,6 +2,8 @@ import type { ProvenanceTier } from "@/models/provenance";
 
 import type { Reading } from "@/models/provenance";
 
+import type { RevenueBand } from "@/models/series";
+
 export type QueryShape =
   | "factual"
   | "discovery"
@@ -49,6 +51,8 @@ export type FactualApp = {
   momentum: Reading<number>;
 
   downloads: Reading<string>;
+
+  revenue: Reading<RevenueBand>;
 };
 
 export type FactualAnswer = {

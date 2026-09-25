@@ -14,12 +14,14 @@ export const FIELD_TIERS = {
   "sourced_facts.value": "verified",
   "download_estimates.label": "estimated",
   "momentum_scores.score": "estimated",
+  "revenue_estimates.low_usd": "estimated",
+  "revenue_estimates.mid_usd": "estimated",
+  "revenue_estimates.high_usd": "estimated",
 } as const;
 
 export type FieldKey = keyof typeof FIELD_TIERS;
 
 export const NO_INFERENCE = [
-  "revenue",
   "downloads",
   "mau",
 ] as const;

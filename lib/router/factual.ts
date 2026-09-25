@@ -1,5 +1,7 @@
 import type { Catalog } from "@/lib/catalog/types";
 
+import { readLatestRevenue } from "@/lib/catalog/revenue";
+
 import { downloadRange } from "@/lib/pipeline/download";
 
 import { momentumFromCharts } from "@/lib/pipeline/momentum";
@@ -9,14 +11,22 @@ import {
   METADATA_MAX_AGE_MS,
 } from "@/lib/provenance/staleness";
 
+import { unavailable } from "@/lib/provenance/assign";
+
 import {
   lookupByName,
   refreshOneApp,
 } from "@/lib/scrape/single";
 
+import { openCatalog } from "@/lib/scrape/store";
+
 import type { FactualAnswer } from "@/lib/types";
 
 import type { AppMetadata } from "@/models/app";
+
+import type { Reading } from "@/models/provenance";
+
+import type { RevenueBand } from "@/models/series";
 
 export async function answerFactual(
   query: string,
@@ -75,8 +85,23 @@ export async function answerFactual(
         ? "verified"
         : "unavailable",
       momentumFromCharts(charts),
+      loadRevenue(app.trackId),
     ),
   };
+}
+
+function loadRevenue(
+  trackId: number,
+): Reading<RevenueBand> {
+  const db = openCatalog();
+
+  try {
+    return readLatestRevenue(db, trackId);
+  } catch {
+    return unavailable();
+  } finally {
+    db.close();
+  }
 }
 
 function factualFrom(
@@ -85,6 +110,7 @@ function factualFrom(
   ratingCount: number | null,
   ratingTier: "verified" | "unavailable",
   momentum: ReturnType<typeof momentumFromCharts>,
+  revenue: Reading<RevenueBand>,
 ) {
   return {
     trackId: app.trackId,
@@ -100,5 +126,6 @@ function factualFrom(
     metadataFetchedAt: app.metadataFetchedAt,
     momentum,
     downloads: downloadRange(),
+    revenue,
   };
 }
