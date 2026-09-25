@@ -1,6 +1,10 @@
 import type { Catalog } from "@/lib/catalog/types";
 
-import { readLatestRevenue } from "@/lib/catalog/revenue";
+import {
+  readLatestRevenue,
+  rollupArr,
+  rollupMrr,
+} from "@/lib/catalog/revenue";
 
 import { downloadRange } from "@/lib/pipeline/download";
 
@@ -127,5 +131,7 @@ function factualFrom(
     momentum,
     downloads: downloadRange(),
     revenue,
+    mrr: rollupMrr(revenue),
+    arr: rollupArr(revenue),
   };
 }

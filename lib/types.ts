@@ -53,6 +53,10 @@ export type FactualApp = {
   downloads: Reading<string>;
 
   revenue: Reading<RevenueBand>;
+
+  mrr: Reading<string>;
+
+  arr: Reading<string>;
 };
 
 export type FactualAnswer = {
