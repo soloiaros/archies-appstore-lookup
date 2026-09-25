@@ -6,8 +6,6 @@ import { GeistSans } from "geist/font/sans";
 
 import { SiteHeader } from "@/components/SiteHeader";
 
-import { SocialLinks } from "@/components/SocialLinks";
-
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,8 +33,6 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <SiteHeader />
-
-        <SocialLinks />
 
         {children}
       </body>

@@ -9,13 +9,7 @@ export const metadata: Metadata = {
 export default function StudioPage() {
   return (
     <SectionPage>
-      <main className="sheet">
-        <h1>Studio</h1>
-
-        <p className="sheet-lead">
-          The bench for tuning 10K. Empty for now.
-        </p>
-      </main>
+      <main className="shell" />
     </SectionPage>
   );
 }
