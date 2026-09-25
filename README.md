@@ -2,7 +2,7 @@
 
 Describe an app, or name one, and the matching icons come up, each with how likely it is. The catalog is the US App Store charts: metadata, ratings, and chart ranks from Apple's public feeds, tagged with what is actually known.
 
-Every shown field is `verified`, `estimated`, or `unavailable`. Downloads, revenue, and MAU stay empty unless a cited source or a recorded method is attached. A missing number is shown as unavailable. It is not filled with a guess.
+Every shown field is `verified`, `estimated`, or `unavailable`. Downloads and MAU stay empty unless a cited source or a recorded method is attached. US store spend / day is estimated from US top-grossing ranks via a cited power-law curve (`us-grossing-power-v1`); apps with no usable grossing observation stay unavailable. A missing number is shown as unavailable. It is not filled with a guess.
 
 The interaction shape comes from [aayans-yc-indexor](https://github.com/Aayan-DEV/aayans-yc-indexor) (MIT). This tree runs as an ordinary Node website. It does not use that project's Core ML binary. See [NOTICE](NOTICE) for what the license does and does not cover.
 
@@ -59,7 +59,7 @@ npm run poll:momentum
 
 `embed:pass` writes description embeddings, SigLIP2 icon embeddings, a pixel color summary, and Tesseract text from each icon. An icon is skipped only when both the source hash and the model id already match, so changing the model re-embeds it. Re-running with no changes is a no-op.
 
-`poll:momentum` runs the same refresh and appends that day's rating and chart rows. Momentum needs two of those days. One snapshot stays unavailable.
+`poll:momentum` runs the same refresh and appends that day's rating and chart rows. Momentum needs two of those days. One snapshot stays unavailable. After refresh it also writes `revenue_estimates` from that day's grossing ranks. Re-run `npm run estimate:revenue` to backfill without polling.
 
 `tag:pass` does not call an API. Tags for a 50-app subset live in `data/tags/` and were assigned offline against `data/tags/tags.json`. The tag channel is thin outside that subset.
 

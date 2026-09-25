@@ -12,7 +12,11 @@ The rating-count velocity formula is not chosen yet.
 
 No category ratio is assumed. A download figure without a method in the same object is not written.
 
-Revenue, downloads, and MAU are not inferred.
+Downloads and MAU are not inferred.
+
+## US store spend
+
+US gross consumer spend per day is estimated offline from `chart_snapshots` top-grossing ranks and the cited curve in `data/revenue-curves/us-grossing-v1.json`. Method `us-grossing-power-v1`: `spend(rank) = A * rank^(-α)`. Overall ranks use band factor 2. Category ranks scale from same-day dual-listed apps (log-interpolated overall-curve dollars), band factor 2.5. Off-chart and unanchored category titles get an upper bound only. Rows live in `revenue_estimates`; the read path never invents a number.
 
 ## RSS feeds
 
