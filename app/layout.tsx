@@ -4,12 +4,17 @@ import { GeistMono } from "geist/font/mono";
 
 import { GeistSans } from "geist/font/sans";
 
+import { SiteHeader } from "@/components/SiteHeader";
+
 import { SocialLinks } from "@/components/SocialLinks";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "App Store Indexor",
+  title: {
+    default: "10K",
+    template: "%s · 10K",
+  },
 
   description:
     "Find App Store apps by what they do, with provenance on every field.",
@@ -29,6 +34,8 @@ export default function RootLayout({
         className="font-sans antialiased"
         suppressHydrationWarning
       >
+        <SiteHeader />
+
         <SocialLinks />
 
         {children}
