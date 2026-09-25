@@ -4,7 +4,11 @@ import { downloadRange } from "@/lib/pipeline/download";
 
 import { momentumFromCharts } from "@/lib/pipeline/momentum";
 
-import { readLatestRevenue } from "@/lib/catalog/revenue";
+import {
+  readLatestRevenue,
+  rollupArr,
+  rollupMrr,
+} from "@/lib/catalog/revenue";
 
 import type { ProvenanceTier } from "@/models/provenance";
 
@@ -74,6 +78,10 @@ export type AppDetail = {
   downloads: Reading<string>;
 
   revenue: Reading<RevenueBand>;
+
+  mrr: Reading<string>;
+
+  arr: Reading<string>;
 
   signals: {
     colorText: string;
@@ -265,6 +273,8 @@ export function loadAppDetail(
       })),
     );
 
+    const revenue = readLatestRevenue(db, trackId);
+
     return {
       tier: row.tier,
       trackId: Number(row.trackId),
@@ -306,7 +316,9 @@ export function loadAppDetail(
       },
       momentum,
       downloads: downloadRange(),
-      revenue: readLatestRevenue(db, trackId),
+      revenue,
+      mrr: rollupMrr(revenue),
+      arr: rollupArr(revenue),
       signals: signals
         ? {
             colorText: String(signals.colorText),

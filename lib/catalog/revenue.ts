@@ -86,6 +86,67 @@ export function formatRevenueBand(
   return "—";
 }
 
+export function rollupMrr(
+  daily: Reading<RevenueBand>,
+): Reading<string> {
+  return rollupRunRate(daily, 30, "× 30");
+}
+
+export function rollupArr(
+  daily: Reading<RevenueBand>,
+): Reading<string> {
+  return rollupRunRate(daily, 30 * 12, "× 30 × 12");
+}
+
+export function formatRunRate(
+  band: RevenueBand,
+): string {
+  if (band.mid !== null && band.low !== null) {
+    return `${compactUsd(band.low)} – ${compactUsd(band.high ?? band.mid)}`;
+  }
+
+  if (band.high !== null) {
+    return `<${compactUsd(band.high)}`;
+  }
+
+  return "—";
+}
+
+function rollupRunRate(
+  daily: Reading<RevenueBand>,
+  factor: number,
+  scaleNote: string,
+): Reading<string> {
+  if (daily.tier !== "estimated") {
+    return unavailable();
+  }
+
+  const band = daily.value;
+
+  const scaled: RevenueBand = {
+    low:
+      band.low === null
+        ? null
+        : band.low * factor,
+    mid:
+      band.mid === null
+        ? null
+        : band.mid * factor,
+    high:
+      band.high === null
+        ? null
+        : band.high * factor,
+    basis: band.basis,
+    country: band.country,
+    day: band.day,
+  };
+
+  return estimated(
+    formatRunRate(scaled),
+    `US store-spend run rate from daily grossing curve (${daily.method} ${scaleNote})`,
+  );
+}
+
 function money(
   value: number,
 ): string {
@@ -95,6 +156,26 @@ function money(
 
   if (value >= 1_000) {
     return `$${(value / 1_000).toFixed(1)}k`;
+  }
+
+  return `$${Math.round(value)}`;
+}
+
+function compactUsd(
+  value: number,
+): string {
+  if (value >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1)}M`;
+  }
+
+  if (value >= 1_000) {
+    const k = value / 1_000;
+
+    if (Math.abs(k - Math.round(k)) < 1e-9) {
+      return `$${Math.round(k)}k`;
+    }
+
+    return `$${k.toFixed(1)}k`;
   }
 
   return `$${Math.round(value)}`;
