@@ -1,0 +1,23 @@
+{
+  "id": "us-grossing-v1",
+  "method": "us-grossing-power-v1",
+  "country": "us",
+  "alpha": 0.95,
+  "A": 4000000,
+  "bandOverall": 2,
+  "bandGenre": 2.5,
+  "citations": [
+    {
+      "title": "How App Store revenue estimates work",
+      "url": "https://openaso.ai/reference/revenue-estimates",
+      "notedAt": "2026-09-25"
+    }
+  ],
+  "anchors": [
+    {
+      "rank": 1,
+      "spendUsdPerDay": 4000000,
+      "note": "US overall #1 on the order of $4M/day gross consumer spend"
+    }
+  ]
+}

@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "scrape:seed": "tsx scripts/scrape-seed.ts",
     "poll:momentum": "tsx scripts/poll-momentum.ts",
+    "estimate:revenue": "tsx scripts/estimate-revenue.ts",
     "tag:pass": "tsx scripts/tag-pass.ts",
     "embed:pass": "tsx scripts/embed-pass.ts",
     "embed:probe": "tsx scripts/probe-embeddings.ts",
@@ -19,6 +20,7 @@
     "validate:index": "tsx scripts/validate-index.ts",
     "test:jev": "tsx scripts/test-jev-mock.ts",
     "test:staleness": "tsx scripts/test-staleness.ts",
+    "test:revenue": "tsx scripts/test-revenue.ts",
     "exercise:query": "tsx scripts/exercise-query.ts",
     "atlas": "node scripts/build-atlas.mjs"
   },

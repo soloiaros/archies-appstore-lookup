@@ -9,6 +9,7 @@ import type { AppMetadata } from "@/models/app";
 import type {
   ChartSnapshot,
   RatingSnapshot,
+  RevenueEstimateRow,
   VersionRelease,
 } from "@/models/series";
 
@@ -651,6 +652,78 @@ export function upsertIconSignals(
         row.colorText,
         JSON.stringify(row.colors),
         row.letters,
+      );
+    }
+
+    db.exec("commit");
+  } catch (error) {
+    db.exec("rollback");
+
+    throw error;
+  }
+}
+
+export function upsertRevenueEstimates(
+  db: DatabaseSync,
+  rows: RevenueEstimateRow[],
+): void {
+  const write = db.prepare(`
+    insert into revenue_estimates (
+      track_id,
+      captured_on,
+      country,
+      basis,
+      rank,
+      chart,
+      genre_id,
+      low_usd,
+      mid_usd,
+      high_usd,
+      tier,
+      method
+    ) values (
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'estimated', ?
+    )
+    on conflict (
+      track_id,
+      captured_on,
+      country
+    ) do update set
+      basis = excluded.basis,
+      rank = excluded.rank,
+      chart = excluded.chart,
+      genre_id = excluded.genre_id,
+      low_usd = excluded.low_usd,
+      mid_usd = excluded.mid_usd,
+      high_usd = excluded.high_usd,
+      method = excluded.method
+    where
+      revenue_estimates.basis is not excluded.basis
+      or revenue_estimates.rank is not excluded.rank
+      or revenue_estimates.chart is not excluded.chart
+      or revenue_estimates.genre_id is not excluded.genre_id
+      or revenue_estimates.low_usd is not excluded.low_usd
+      or revenue_estimates.mid_usd is not excluded.mid_usd
+      or revenue_estimates.high_usd is not excluded.high_usd
+      or revenue_estimates.method is not excluded.method
+  `);
+
+  db.exec("begin");
+
+  try {
+    for (const row of rows) {
+      write.run(
+        row.trackId,
+        row.capturedOn,
+        row.country,
+        row.basis,
+        row.rank,
+        row.chart,
+        row.genreId,
+        row.lowUsd,
+        row.midUsd,
+        row.highUsd,
+        row.method,
       );
     }
 

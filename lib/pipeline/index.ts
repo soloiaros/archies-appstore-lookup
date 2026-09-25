@@ -14,4 +14,11 @@ export { reportPoll } from "@/lib/pipeline/monitor";
 
 export { readScreenshots } from "@/lib/pipeline/ocr";
 
+export {
+  estimateRevenue,
+  loadRevenueCurve,
+  runRevenueEstimates,
+  spendAtRank,
+} from "@/lib/pipeline/revenue";
+
 export { tagApps } from "@/lib/pipeline/tags";

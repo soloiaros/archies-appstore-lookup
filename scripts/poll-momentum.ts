@@ -9,6 +9,8 @@ import {
 
 import { reportPoll } from "../lib/pipeline/monitor";
 
+import { runRevenueEstimates } from "../lib/pipeline/revenue";
+
 import { refreshCatalog } from "../lib/scrape/refresh";
 
 loadLocalEnv();
@@ -46,6 +48,14 @@ async function main(): Promise<void> {
     });
 
     console.log(detail);
+
+    const revenue = runRevenueEstimates();
+
+    console.log(
+      JSON.stringify({
+        revenue,
+      }),
+    );
   } catch (error) {
     reportPoll({
       ok: false,
