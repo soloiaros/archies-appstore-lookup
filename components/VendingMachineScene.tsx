@@ -5,10 +5,24 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/addons/postprocessing/BokehPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
+import { ColorCorrectionShader } from "three/addons/shaders/ColorCorrectionShader.js";
 
 const SITE_BG = 0x0b0b0c;
 
-/** Product shelves, bottom → top (pre-center names). */
+/**
+ * Served asset: public/vending_machine.glb (5.36 MB, 55 meshes).
+ * Root vending_machine_optimized*.glb are still empty Blender stubs
+ * (236 / 132 bytes, no meshes) — cannot be the scene source.
+ */
+const MODEL_URL = "/vending_machine.glb";
+
 const SHELF_NAMES = [
   "polySurface263",
   "polySurface256",
@@ -17,19 +31,9 @@ const SHELF_NAMES = [
   "polySurface264",
 ] as const;
 
-/** Thin front window pane (min-Z face). */
 const GLASS_MESH = "pCube413_lambert1_0";
 
-/** Front base lip — customer mouth sits just above this. */
-const FRONT_LIP = "polySurface362";
-
-/**
- * Front face is min-Z (glass pCube413). Camera looks from −Z.
- * Keypad is on +X (screen-right) in that view.
- */
-
-/** Tightest inter-shelf gap is ~0.40 — size planes to clear it. */
-const PLANE_SIZE = 0.30;
+const PLANE_SIZE = 0.3;
 
 const SLIDE_DISTANCE = 0.26;
 
@@ -37,10 +41,15 @@ const SLIDE_MS = 280;
 
 const FALL_MS = 560;
 
-const PLANE_COLOR = 0xe8e8ea;
+const PLANE_COLOR = 0x9a9aa0;
 
-/** Sticky header + nav pills; shift frustum so cabinet clears them. */
-const HEADER_NUDGE_FRAC = 0.18;
+/** ~50mm full-frame equivalent. */
+const FOCAL_LENGTH_MM = 50;
+
+const FILM_GAUGE_MM = 36;
+
+/** Green blinker pulse (Hz). */
+const BLINK_HZ = 1.35;
 
 type AnimPhase = "idle" | "slide" | "fall" | "done";
 
@@ -87,6 +96,36 @@ function disposeOwned(root: THREE.Object3D) {
   });
 }
 
+function darkenCabinet(root: THREE.Object3D): THREE.Material[] {
+  const owned: THREE.Material[] = [];
+
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+
+    if (!mesh.isMesh) {
+      return;
+    }
+
+    if (mesh.userData.isNeon || mesh.name === GLASS_MESH) {
+      return;
+    }
+
+    if (mesh.userData.clickable) {
+      return;
+    }
+
+    const dark = new THREE.MeshBasicMaterial({
+      color: 0x1c1c20,
+      toneMapped: true,
+    });
+    dark.userData.ownsClone = true;
+    owned.push(dark);
+    mesh.material = dark;
+  });
+
+  return owned;
+}
+
 function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   const cloned: THREE.Material[] = [];
   const mesh = root.getObjectByName(GLASS_MESH) as THREE.Mesh | undefined;
@@ -105,19 +144,20 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
     const glass = m.clone();
     glass.userData.ownsClone = true;
     glass.transparent = true;
-    glass.opacity = 0.18;
+    glass.opacity = 0.12;
     glass.depthWrite = false;
     glass.side = THREE.DoubleSide;
 
     const std = glass as THREE.MeshStandardMaterial;
 
     if (std.color) {
-      std.color.setHex(0xc8d0da);
+      std.color.setHex(0x101418);
     }
 
     if ("roughness" in std) {
-      std.roughness = 0.12;
-      std.metalness = 0.02;
+      std.roughness = 0.08;
+      std.metalness = 0.05;
+      std.emissive?.setHex(0x000000);
     }
 
     cloned.push(glass);
@@ -130,17 +170,208 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   return cloned;
 }
 
+function isLightMeshName(name: string): boolean {
+  return /light/i.test(name);
+}
+
+function isBlinkMeshName(name: string): boolean {
+  return /blink/i.test(name);
+}
+
+function makeNeonMaterial(
+  color: number,
+  intensity: number,
+): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    emissive: new THREE.Color(color),
+    emissiveIntensity: intensity,
+    roughness: 1,
+    metalness: 0,
+    toneMapped: false,
+  });
+  mat.userData.ownsClone = true;
+  mat.userData.isNeon = true;
+  return mat;
+}
+
+/**
+ * Optimized lights GLB is empty — install neon fixtures along the
+ * glass bay to match the reference interior LED frame + blinker.
+ */
+function installNeonFixtures(
+  root: THREE.Object3D,
+  glassBox: THREE.Box3,
+): { whites: THREE.Mesh[]; blink: THREE.Mesh | null; owned: THREE.Material[] } {
+  const owned: THREE.Material[] = [];
+  const whites: THREE.Mesh[] = [];
+  const group = new THREE.Group();
+  group.name = "lights";
+
+  const toLocal = (x: number, y: number, z: number) =>
+    root.worldToLocal(new THREE.Vector3(x, y, z));
+
+  const gx0 = glassBox.min.x + 0.06;
+  const gx1 = glassBox.max.x - 0.06;
+  const gy0 = glassBox.min.y + 0.08;
+  const gy1 = glassBox.max.y - 0.06;
+  const gz = glassBox.min.z + 0.04;
+  const spanX = gx1 - gx0;
+  const spanY = gy1 - gy0;
+  const tube = 0.045;
+
+  const specs: {
+    name: string;
+    w: number;
+    h: number;
+    d: number;
+    x: number;
+    y: number;
+    z: number;
+  }[] = [
+    {
+      name: "light",
+      w: spanX,
+      h: tube,
+      d: tube,
+      x: (gx0 + gx1) / 2,
+      y: gy1,
+      z: gz,
+    },
+    {
+      name: "light.001",
+      w: tube,
+      h: spanY,
+      d: tube,
+      x: gx0,
+      y: (gy0 + gy1) / 2,
+      z: gz,
+    },
+    {
+      name: "light.002",
+      w: tube,
+      h: spanY,
+      d: tube,
+      x: gx1,
+      y: (gy0 + gy1) / 2,
+      z: gz,
+    },
+    {
+      name: "light.003",
+      w: spanX * 0.92,
+      h: tube,
+      d: tube,
+      x: (gx0 + gx1) / 2,
+      y: gy0 + 0.12,
+      z: gz,
+    },
+  ];
+
+  for (const s of specs) {
+    const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
+    const mat = makeNeonMaterial(0xffffff, 3.2);
+    owned.push(mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = s.name;
+    mesh.position.copy(toLocal(s.x, s.y, s.z));
+    mesh.userData.ownsGeometry = true;
+    mesh.userData.isNeon = true;
+    group.add(mesh);
+    whites.push(mesh);
+  }
+
+  const blinkMat = makeNeonMaterial(0x39ff14, 4.5);
+  owned.push(blinkMat);
+  const blinkGeo = new THREE.SphereGeometry(0.055, 12, 12);
+  const blink = new THREE.Mesh(blinkGeo, blinkMat);
+  blink.name = "light_blink";
+
+  // status LED on the control fascia (model −X of glass)
+  blink.position.copy(
+    toLocal(
+      glassBox.min.x - 0.42,
+      glassBox.min.y + spanY * 0.18,
+      glassBox.min.z - 0.02,
+    ),
+  );
+
+  blink.userData.ownsGeometry = true;
+  blink.userData.isNeon = true;
+  blink.userData.isBlink = true;
+  group.add(blink);
+
+  root.add(group);
+
+  return { whites, blink, owned };
+}
+
+function collectOrInstallLights(
+  root: THREE.Object3D,
+  glassBox: THREE.Box3,
+): {
+  whites: THREE.Mesh[];
+  blink: THREE.Mesh | null;
+  owned: THREE.Material[];
+  source: "model" | "fixtures";
+} {
+  const whites: THREE.Mesh[] = [];
+  const blinkFound: THREE.Mesh[] = [];
+
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+
+    if (!mesh.isMesh) {
+      return;
+    }
+
+    if (isBlinkMeshName(mesh.name)) {
+      blinkFound.push(mesh);
+      return;
+    }
+
+    if (isLightMeshName(mesh.name)) {
+      whites.push(mesh);
+    }
+  });
+
+  const blink = blinkFound[0] ?? null;
+
+  if (whites.length === 0 && !blink) {
+    const installed = installNeonFixtures(root, glassBox);
+    return { ...installed, source: "fixtures" };
+  }
+
+  const owned: THREE.Material[] = [];
+
+  for (const mesh of whites) {
+    const mat = makeNeonMaterial(0xffffff, 3.2);
+    owned.push(mat);
+    mesh.material = mat;
+    mesh.userData.isNeon = true;
+  }
+
+  if (blink) {
+    const mat = makeNeonMaterial(0x39ff14, 4.5);
+    owned.push(mat);
+    blink.material = mat;
+    blink.userData.isNeon = true;
+    blink.userData.isBlink = true;
+  }
+
+  return { whites, blink, owned, source: "model" };
+}
+
 export function VendingMachineScene() {
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const host = hostRef.current;
+    const hostEl = hostRef.current;
 
-    if (!host) {
+    if (!hostEl) {
       return;
     }
 
-    const mount = host;
+    const mount = hostEl;
 
     let disposed = false;
     let frameId = 0;
@@ -149,7 +380,9 @@ export function VendingMachineScene() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(SITE_BG);
 
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
+    camera.filmGauge = FILM_GAUGE_MM;
+    camera.setFocalLength(FOCAL_LENGTH_MM);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -161,43 +394,49 @@ export function VendingMachineScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.96;
+    // slight lift so silhouette reads; no scene lights
+    renderer.toneMappingExposure = 0.85;
     renderer.setClearColor(SITE_BG, 1);
-    host.appendChild(renderer.domElement);
+    mount.appendChild(renderer.domElement);
 
     const canvas = renderer.domElement;
     canvas.style.display = "block";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
 
-    const ambient = new THREE.AmbientLight(0xd8dce4, 0.78);
-    scene.add(ambient);
+    // NO Ambient/Hemisphere/Directional/Point — neon meshes only
 
-    const hemi = new THREE.HemisphereLight(0xe4e8f0, 0x3a3a42, 0.55);
-    hemi.position.set(0, 20, 0);
-    scene.add(hemi);
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
 
-    // soft front key (from −Z)
-    const key = new THREE.DirectionalLight(0xf4f6fa, 1.05);
-    key.position.set(2, 10, -16);
-    scene.add(key);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(1, 1),
+      0.9,
+      0.35,
+      0.75,
+    );
+    composer.addPass(bloomPass);
 
-    const fill = new THREE.DirectionalLight(0xb0b8c4, 0.55);
-    fill.position.set(-8, 4, -10);
-    scene.add(fill);
+    const bokehPass = new BokehPass(scene, camera, {
+      focus: 14,
+      aperture: 0.00012,
+      maxblur: 0.0035,
+    });
+    composer.addPass(bokehPass);
 
-    // keypad / right fascia
-    const panel = new THREE.DirectionalLight(0xf0f4fa, 0.85);
-    panel.position.set(12, 6, -8);
-    scene.add(panel);
+    const colorPass = new ShaderPass(ColorCorrectionShader);
+    colorPass.uniforms.powRGB.value = new THREE.Vector3(1.2, 1.18, 1.22);
+    colorPass.uniforms.mulRGB.value = new THREE.Vector3(0.85, 0.86, 0.9);
+    composer.addPass(colorPass);
 
-    const rim = new THREE.DirectionalLight(0x8a909a, 0.32);
-    rim.position.set(0, 6, 12);
-    scene.add(rim);
+    const vignettePass = new ShaderPass(VignetteShader);
+    vignettePass.uniforms.offset.value = 1.05;
+    vignettePass.uniforms.darkness.value = 1.15;
+    composer.addPass(vignettePass);
 
-    const bay = new THREE.PointLight(0xf0f4ff, 0.28, 18, 2);
-    bay.position.set(0.2, 2.2, -0.2);
-    scene.add(bay);
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -208,8 +447,9 @@ export function VendingMachineScene() {
 
     let modelRoot: THREE.Object3D | null = null;
     let fitted = false;
+    let blinkMesh: THREE.Mesh | null = null;
+    let blinkBaseIntensity = 6;
 
-    // out of compartment toward the front camera (−Z)
     const outAxis = new THREE.Vector3(0, 0, -1);
     const binBase = new THREE.Vector3();
 
@@ -226,36 +466,49 @@ export function VendingMachineScene() {
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      // generous but large — reference-like framing
-      const margin = 1.28;
-      const viewH = size.y * margin;
-      const viewW = size.x * margin;
       const aspect = mount.clientWidth / Math.max(mount.clientHeight, 1);
-
-      let halfH = viewH / 2;
-      let halfW = viewW / 2;
-
-      if (halfW / halfH < aspect) {
-        halfW = halfH * aspect;
-      } else {
-        halfH = halfW / aspect;
-      }
-
-      // shift frustum up in world → machine sits lower under sticky header
-      const nudge = halfH * HEADER_NUDGE_FRAC;
-
-      camera.left = -halfW;
-      camera.right = halfW;
-      camera.top = halfH + nudge;
-      camera.bottom = -halfH + nudge;
-      camera.near = 0.1;
-      camera.far = 80;
-
-      // FRONT: look from min-Z
-      const frontZ = box.min.z - 18;
-      camera.position.set(center.x, center.y, frontZ);
-      camera.lookAt(center.x, center.y, center.z);
+      camera.aspect = aspect;
+      camera.filmGauge = FILM_GAUGE_MM;
+      camera.setFocalLength(FOCAL_LENGTH_MM);
       camera.updateProjectionMatrix();
+
+      // distance from vertical FOV to frame machine with margin
+      const vFov = THREE.MathUtils.degToRad(camera.fov);
+      const fitH = size.y * 1.18;
+      const fitW = size.x * 1.28;
+      const distH = fitH / (2 * Math.tan(vFov / 2));
+      const distW = fitW / (2 * Math.tan(vFov / 2) * aspect);
+      const dist = Math.max(distH, distW);
+
+      // composed front: slight yaw + downward look, still −Z hemisphere
+      const yaw = THREE.MathUtils.degToRad(9);
+      const pitch = THREE.MathUtils.degToRad(-6);
+      const front = new THREE.Vector3(
+        Math.sin(yaw) * dist * 0.35,
+        Math.sin(-pitch) * dist * 0.25 + size.y * 0.06,
+        -Math.cos(yaw) * dist,
+      );
+
+      camera.position.set(
+        center.x + front.x,
+        center.y + front.y,
+        center.z + front.z,
+      );
+
+      // look below center so sticky header clears the crown
+      camera.lookAt(
+        center.x + size.x * 0.04,
+        center.y - size.y * 0.08,
+        center.z,
+      );
+
+      const focusDist = camera.position.distanceTo(
+        new THREE.Vector3(center.x, center.y + size.y * 0.05, center.z + box.min.z),
+      );
+      const focusUniform = bokehPass.uniforms as {
+        focus: { value: number };
+      };
+      focusUniform.focus.value = focusDist;
     }
 
     function resize() {
@@ -267,6 +520,8 @@ export function VendingMachineScene() {
       }
 
       renderer.setSize(w, h, false);
+      composer.setSize(w, h);
+      bloomPass.resolution.set(w, h);
 
       if (modelRoot && fitted) {
         fitCamera(modelRoot);
@@ -289,31 +544,16 @@ export function VendingMachineScene() {
         }
       }
 
-      const lip = root.getObjectByName(FRONT_LIP);
-      const lipBox = lip ? new THREE.Box3().setFromObject(lip) : null;
-
       const toLocal = (world: THREE.Vector3) => root.worldToLocal(world.clone());
 
-      // retrieval mouth, in front of the fascia so the card stays visible
       if (!glassBox.isEmpty()) {
         const gx = glassBox.getCenter(new THREE.Vector3()).x;
-        const frontZ = new THREE.Box3().setFromObject(root).min.z;
         binBase.copy(
           toLocal(
             new THREE.Vector3(
               gx,
               glassBox.min.y - 0.95,
-              frontZ - 0.04,
-            ),
-          ),
-        );
-      } else if (lipBox && !lipBox.isEmpty()) {
-        binBase.copy(
-          toLocal(
-            new THREE.Vector3(
-              lipBox.getCenter(new THREE.Vector3()).x,
-              lipBox.max.y + 0.55,
-              lipBox.max.z + 0.12,
+              glassBox.min.z + 0.28,
             ),
           ),
         );
@@ -337,8 +577,6 @@ export function VendingMachineScene() {
 
       for (let s = 0; s < shelves.length; s += 1) {
         const shelf = shelves[s];
-
-        // on deck, toward glass (min Z), still inside compartment
         const seatZ = shelf.min.z + 0.22;
         const seatY = shelf.max.y + 0.04;
 
@@ -348,13 +586,12 @@ export function VendingMachineScene() {
             side: THREE.FrontSide,
             depthTest: true,
             depthWrite: true,
+            toneMapped: false,
           });
 
           ownedMats.push(mat);
 
           const mesh = new THREE.Mesh(planeGeo, mat);
-
-          // face the front camera (−Z)
           mesh.rotation.y = Math.PI;
 
           const local = toLocal(
@@ -415,7 +652,6 @@ export function VendingMachineScene() {
 
       mesh.userData.busy = true;
       mesh.userData.clickable = false;
-      mesh.renderOrder = 5;
 
       const start = mesh.position.clone();
       const slideEnd = start.clone().addScaledVector(outAxis, SLIDE_DISTANCE);
@@ -482,20 +718,33 @@ export function VendingMachineScene() {
       }
     }
 
-    function animate() {
+    function updateBlink(now: number) {
+      if (!blinkMesh) {
+        return;
+      }
+
+      const mat = blinkMesh.material as THREE.MeshStandardMaterial;
+      const pulse =
+        0.08 +
+        0.92 * (0.5 + 0.5 * Math.sin(now * 0.001 * Math.PI * 2 * BLINK_HZ));
+      mat.emissiveIntensity = blinkBaseIntensity * pulse;
+    }
+
+    function animate(now: number) {
       if (disposed) {
         return;
       }
 
       frameId = requestAnimationFrame(animate);
-      updateAnims(performance.now());
-      renderer.render(scene, camera);
+      updateAnims(now);
+      updateBlink(now);
+      composer.render();
     }
 
     const loader = new GLTFLoader();
 
     loader.load(
-      "/vending_machine.glb",
+      MODEL_URL,
       (gltf) => {
         if (disposed) {
           disposeOwned(gltf.scene);
@@ -503,11 +752,26 @@ export function VendingMachineScene() {
         }
 
         modelRoot = gltf.scene;
-
         scene.add(modelRoot);
         centerModel(modelRoot);
 
         ownedMats.push(...openFrontGlass(modelRoot));
+
+        const glass = modelRoot.getObjectByName(GLASS_MESH);
+        const glassBox = glass
+          ? new THREE.Box3().setFromObject(glass)
+          : new THREE.Box3().setFromObject(modelRoot);
+
+        const lights = collectOrInstallLights(modelRoot, glassBox);
+        ownedMats.push(...lights.owned);
+        ownedMats.push(...darkenCabinet(modelRoot));
+        blinkMesh = lights.blink;
+
+        if (blinkMesh) {
+          const m = blinkMesh.material as THREE.MeshStandardMaterial;
+          blinkBaseIntensity = m.emissiveIntensity || 4.5;
+        }
+
         placePlanes(modelRoot);
         fitCamera(modelRoot);
         fitted = true;
@@ -520,10 +784,10 @@ export function VendingMachineScene() {
     );
 
     resize();
-    animate();
+    frameId = requestAnimationFrame(animate);
 
     const ro = new ResizeObserver(() => resize());
-    ro.observe(host);
+    ro.observe(mount);
 
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -550,17 +814,11 @@ export function VendingMachineScene() {
         scene.remove(modelRoot);
       }
 
-      ambient.dispose();
-      hemi.dispose();
-      key.dispose();
-      fill.dispose();
-      panel.dispose();
-      rim.dispose();
-      bay.dispose();
+      composer.dispose();
       renderer.dispose();
 
-      if (canvas.parentNode === host) {
-        host.removeChild(canvas);
+      if (canvas.parentNode === mount) {
+        mount.removeChild(canvas);
       }
     };
   }, []);
