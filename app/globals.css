@@ -1110,86 +1110,188 @@ a.locker-link:focus-visible {
   pointer-events: none;
   position: absolute;
   z-index: 3;
-  left: 0.28rem;
-  top: 50%;
-  width: 1.42rem;
-  height: 1.42rem;
-  margin-top: -0.71rem;
-  transform: translateZ(7px);
+  inset: 0;
+  transform: translateZ(7px) scale(0.7);
+  transform-origin: 8.61% 43.4%;
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
 
 .locker-rose {
   position: absolute;
-  inset: 0;
+  z-index: 1;
+  left: 0.65rem;
+  top: 0.2rem;
+  width: 0.68rem;
+  height: 1.94rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      rgb(255 255 255 / 0.22),
+      transparent 30%,
+      transparent 72%,
+      rgb(0 0 0 / 0.18)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0.07) 0 1px,
+      transparent 1px 2px
+    ),
+    linear-gradient(
+      90deg,
+      #8a8a86 0%,
+      #f4f4f0 9%,
+      #fbfbf8 20%,
+      #d2d2cc 44%,
+      #a4a4a0 68%,
+      #6a6a66 100%
+    );
+  box-shadow:
+    1px 1px 0 rgb(255 255 255 / 0.28),
+    2px 2px 4px rgb(0 0 0 / 0.42),
+    inset 1px 0 0 rgb(255 255 255 / 0.72),
+    inset -1px 0 1px rgb(0 0 0 / 0.38),
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -1px 0 rgb(0 0 0 / 0.32);
+}
+
+.locker-screw {
+  position: absolute;
+  left: 50%;
+  width: 0.18rem;
+  height: 0.18rem;
+  margin-left: -0.09rem;
+  border-radius: 50%;
+  background:
+    linear-gradient(#2a2a28, #2a2a28) center / 70% 1px no-repeat,
+    radial-gradient(
+      circle at 35% 30%,
+      #ffffff,
+      #c8c8c4 42%,
+      #6e6e6a 78%,
+      #3a3a38
+    );
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 0.35),
+    inset 0 0.5px 0 rgb(255 255 255 / 0.75),
+    0 0.5px 0.5px rgb(0 0 0 / 0.4);
+}
+
+.locker-rose .locker-screw:first-child {
+  top: 0.14rem;
+}
+
+.locker-rose .locker-screw:nth-child(2) {
+  bottom: 0.14rem;
+}
+
+.locker-keyhole {
+  position: absolute;
+  left: 50%;
+  bottom: 0.38rem;
+  width: 0.2rem;
+  height: 0.3rem;
+  margin-left: -0.1rem;
+  background:
+    radial-gradient(
+      circle at 50% 0.09rem,
+      #141412 0.075rem,
+      transparent 0.08rem
+    ),
+    linear-gradient(#141412, #0c0c0b);
+  background-repeat: no-repeat;
+  background-size:
+    100% 0.2rem,
+    0.08rem 0.18rem;
+  background-position:
+    center top,
+    center 0.12rem;
+  filter: drop-shadow(0.4px 0.5px 0 rgb(255 255 255 / 0.28));
+}
+
+.locker-boss {
+  position: absolute;
+  z-index: 2;
+  left: 0.99rem;
+  top: 1.02rem;
+  width: 0.66rem;
+  height: 0.66rem;
+  margin-left: -0.33rem;
+  margin-top: -0.33rem;
   border-radius: 50%;
   background:
     radial-gradient(
       circle at 50% 50%,
-      #5e5e5a 0 28%,
-      #a4a4a0 34%,
-      #7a7a76 46%,
-      #4e4e4c 68%,
-      #2c2c2a 100%
+      #d6d6da 0 60%,
+      #8e8e94 82%,
+      #4c4c52 100%
     );
   box-shadow:
-    0 1px 0 rgb(255 255 255 / 0.35),
-    0 2px 4px rgb(0 0 0 / 0.5),
-    inset 0 1px 1px rgb(255 255 255 / 0.55),
-    inset 0 -2px 3px rgb(0 0 0 / 0.55);
+    0 1px 1.5px rgb(0 0 0 / 0.38),
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -1px 1px rgb(0 0 0 / 0.32);
 }
 
 .locker-lever {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 3.35rem;
-  height: 1.15rem;
-  margin-left: -0.62rem;
-  margin-top: -0.575rem;
-  transform-origin: 0.62rem 50%;
+  z-index: 3;
+  left: 0.99rem;
+  top: 0.83rem;
+  width: 2.73rem;
+  height: 0.38rem;
+  transform-origin: 0 50%;
   transform: rotate(0deg);
   transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.locker-lever-shade,
+.locker-lever-shade {
+  position: absolute;
+  z-index: 0;
+  left: 0.2rem;
+  right: 0.08rem;
+  top: 0.24rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.36);
+  filter: blur(1px);
+}
+
 .locker-lever-body {
   position: absolute;
-  inset: 0;
-  clip-path: polygon(
-    2% 24%,
-    12% 10%,
-    78% 22%,
-    100% 50%,
-    78% 78%,
-    12% 90%,
-    2% 76%
-  );
-}
-
-.locker-lever-shade {
-  background: linear-gradient(180deg, #3a3a38, #1c1c1b);
-  transform: translateY(3px);
-}
-
-.locker-lever-body {
-  background: linear-gradient(
-    180deg,
-    #f7f7f4 0%,
-    #d2d2cc 18%,
-    #9a9a94 40%,
-    #6e6e6a 68%,
-    #454542 100%
-  );
+  z-index: 1;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 0.05rem 999px 999px 0.05rem;
+  background:
+    linear-gradient(
+      90deg,
+      rgb(30 30 34 / 0.4) 0 0.06rem,
+      transparent 0.14rem
+    ),
+    linear-gradient(
+      180deg,
+      #45454a 0%,
+      #9a9aa0 5%,
+      #f2f2f4 13%,
+      #dcdce0 24%,
+      #b4b4ba 42%,
+      #8c8c94 60%,
+      #5e5e66 78%,
+      #34343a 93%,
+      #5a5a60 100%
+    );
   box-shadow:
-    inset 0 1px 0 #fff,
-    inset 0 -1px 0 rgb(0 0 0 / 0.35);
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -1px 0 rgb(0 0 0 / 0.4),
+    0 1px 1px rgb(0 0 0 / 0.28);
 }
 
 .locker-door:hover .locker-lever,
 .locker-door:focus-visible .locker-lever {
-  transform: rotate(54deg);
+  transform: rotate(27deg);
 }
 
 .locker-vents {
