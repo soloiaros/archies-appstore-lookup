@@ -43,6 +43,10 @@ export function FactualCard({
 
   const revenue = app?.revenue ?? unavailable();
 
+  const mrr = app?.mrr ?? unavailable();
+
+  const arr = app?.arr ?? unavailable();
+
   return (
     <OutputPanel data-shape="factual">
       {app ? (
@@ -163,6 +167,44 @@ export function FactualCard({
           <span>
             {" "}
             {formatRevenueBand(revenue.value)}
+          </span>
+        ) : null}
+      </p>
+
+      <p>
+        MRR
+        {" "}
+        <ProvenanceMark
+          tier={mrr.tier}
+          method={
+            mrr.tier === "estimated"
+              ? mrr.method
+              : undefined
+          }
+        />
+        {mrr.tier === "estimated" ? (
+          <span>
+            {" "}
+            {mrr.value}
+          </span>
+        ) : null}
+      </p>
+
+      <p>
+        ARR
+        {" "}
+        <ProvenanceMark
+          tier={arr.tier}
+          method={
+            arr.tier === "estimated"
+              ? arr.method
+              : undefined
+          }
+        />
+        {arr.tier === "estimated" ? (
+          <span>
+            {" "}
+            {arr.value}
           </span>
         ) : null}
       </p>

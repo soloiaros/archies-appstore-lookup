@@ -186,10 +186,6 @@ function DetailFields({
         {detail.sellerName}
       </Field>
 
-      <Field label="Category">
-        {detail.primaryGenre}
-      </Field>
-
       {detail.genres.length > 0 ? (
         <Field label="Genres">
           {detail.genres.join(", ")}
@@ -198,10 +194,6 @@ function DetailFields({
 
       <Field label="Price">
         {detail.formattedPrice}
-      </Field>
-
-      <Field label="Version">
-        {detail.version}
       </Field>
 
       <Field label="Released">
@@ -235,12 +227,21 @@ function DetailFields({
         )}
       </Field>
 
-      <Field label="Downloads">
+      <Field label="Monthly downloads">
+        <ProvenanceMark
+          tier={detail.downloads.tier}
+          method={
+            detail.downloads.tier === "estimated"
+              ? detail.downloads.method
+              : undefined
+          }
+        />
         {detail.downloads.tier === "estimated" ? (
-          <span>{detail.downloads.value}</span>
-        ) : (
-          <span>—</span>
-        )}
+          <span>
+            {" "}
+            {detail.downloads.value}
+          </span>
+        ) : null}
       </Field>
 
       <Field label="US store spend / day">
@@ -256,6 +257,40 @@ function DetailFields({
           <span>
             {" "}
             {formatRevenueBand(detail.revenue.value)}
+          </span>
+        ) : null}
+      </Field>
+
+      <Field label="MRR">
+        <ProvenanceMark
+          tier={detail.mrr.tier}
+          method={
+            detail.mrr.tier === "estimated"
+              ? detail.mrr.method
+              : undefined
+          }
+        />
+        {detail.mrr.tier === "estimated" ? (
+          <span>
+            {" "}
+            {detail.mrr.value}
+          </span>
+        ) : null}
+      </Field>
+
+      <Field label="ARR">
+        <ProvenanceMark
+          tier={detail.arr.tier}
+          method={
+            detail.arr.tier === "estimated"
+              ? detail.arr.method
+              : undefined
+          }
+        />
+        {detail.arr.tier === "estimated" ? (
+          <span>
+            {" "}
+            {detail.arr.value}
           </span>
         ) : null}
       </Field>
@@ -277,15 +312,9 @@ function DetailFields({
       ) : null}
 
       {detail.signals ? (
-        <>
-          <Field label="Icon color">
-            {detail.signals.colorText || "—"}
-          </Field>
-
-          <Field label="Icon letters">
-            {detail.signals.letters || "—"}
-          </Field>
-        </>
+        <Field label="Icon color">
+          {detail.signals.colorText || "—"}
+        </Field>
       ) : null}
 
       {detail.tags.length > 0 ? (
