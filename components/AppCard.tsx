@@ -10,6 +10,10 @@ import {
 
 import { DirectionalPage } from "@/components/DirectionalPage";
 
+import { ProvenanceMark } from "@/components/ProvenanceMark";
+
+import { formatRevenueBand } from "@/lib/catalog/revenue";
+
 import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
 
 export function iconTransitionName(
@@ -237,6 +241,23 @@ function DetailFields({
         ) : (
           <span>—</span>
         )}
+      </Field>
+
+      <Field label="US store spend / day">
+        <ProvenanceMark
+          tier={detail.revenue.tier}
+          method={
+            detail.revenue.tier === "estimated"
+              ? detail.revenue.method
+              : undefined
+          }
+        />
+        {detail.revenue.tier === "estimated" ? (
+          <span>
+            {" "}
+            {formatRevenueBand(detail.revenue.value)}
+          </span>
+        ) : null}
       </Field>
 
       <Field label="Age rating">

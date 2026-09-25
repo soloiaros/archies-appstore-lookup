@@ -13,6 +13,8 @@ import { useStaleness } from "@/hooks/useStaleness";
 
 import { unavailable } from "@/lib/provenance/assign";
 
+import { formatRevenueBand } from "@/lib/catalog/revenue";
+
 import type { FactualApp } from "@/lib/types";
 
 import type { ProvenanceTier } from "@/models/provenance";
@@ -38,6 +40,8 @@ export function FactualCard({
   const momentum = app?.momentum ?? unavailable();
 
   const downloads = app?.downloads ?? unavailable();
+
+  const revenue = app?.revenue ?? unavailable();
 
   return (
     <OutputPanel data-shape="factual">
@@ -140,6 +144,25 @@ export function FactualCard({
           <span>
             {" "}
             {downloads.value}
+          </span>
+        ) : null}
+      </p>
+
+      <p>
+        US store spend / day
+        {" "}
+        <ProvenanceMark
+          tier={revenue.tier}
+          method={
+            revenue.tier === "estimated"
+              ? revenue.method
+              : undefined
+          }
+        />
+        {revenue.tier === "estimated" ? (
+          <span>
+            {" "}
+            {formatRevenueBand(revenue.value)}
           </span>
         ) : null}
       </p>
