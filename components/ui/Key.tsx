@@ -21,7 +21,13 @@ export function Key({
 
   className?: string;
 }) {
-  const classes = className ? `ui-key ${className}` : "ui-key";
+  const classes = [
+    "ui-key",
+    led ? "ui-key-led" : null,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <Link
