@@ -40,7 +40,7 @@ const SQUIRCLE_N = 5;
 
 const CARD_DEPTH = 0.032;
 
-const BASE_CARD_SIZE = 0.34;
+const BASE_CARD_SIZE = 0.52;
 
 const SLIDE_MS = 900;
 
@@ -861,7 +861,7 @@ export function VendingMachineScene() {
         f.add(row, "x", -1.5, 1.5, 0.005).onChange(layoutCards);
         f.add(row, "y", -1.5, 1.5, 0.005).onChange(layoutCards);
         f.add(row, "z", -1.5, 1.5, 0.005).onChange(layoutCards);
-        f.add(row, "cardSize", 0.1, 0.55, 0.005).onChange(layoutCards);
+        f.add(row, "cardSize", 0.2, 2, 0.01).onChange(layoutCards);
         f.add(row, "depthGap", 0.02, 0.25, 0.005).onChange(layoutCards);
       });
 
