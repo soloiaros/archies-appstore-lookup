@@ -71,3 +71,47 @@ export type SourcedFact = {
 
   citation: Citation;
 };
+
+export type RevenueBasis =
+  | "overall-grossing"
+  | "genre-grossing"
+  | "genre-ceiling"
+  | "below-grossing";
+
+export type RevenueBand = {
+  low: number | null;
+
+  mid: number | null;
+
+  high: number | null;
+
+  basis: RevenueBasis;
+
+  country: string;
+
+  day: string;
+};
+
+export type RevenueEstimateRow = {
+  trackId: number;
+
+  capturedOn: string;
+
+  country: string;
+
+  basis: RevenueBasis;
+
+  rank: number | null;
+
+  chart: "top-grossing" | null;
+
+  genreId: number | null;
+
+  lowUsd: number | null;
+
+  midUsd: number | null;
+
+  highUsd: number | null;
+
+  method: string;
+};

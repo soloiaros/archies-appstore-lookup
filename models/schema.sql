@@ -129,3 +129,39 @@ create table if not exists icon_signals (
   colors text not null,
   letters text not null
 );
+
+create table if not exists revenue_estimates (
+  track_id integer not null references apps (track_id),
+  captured_on text not null,
+  country text not null,
+  basis text not null check (
+    basis in (
+      'overall-grossing',
+      'genre-grossing',
+      'genre-ceiling',
+      'below-grossing'
+    )
+  ),
+  rank integer check (
+    rank is null
+    or rank > 0
+  ),
+  chart text check (
+    chart is null
+    or chart = 'top-grossing'
+  ),
+  genre_id integer,
+  low_usd real,
+  mid_usd real,
+  high_usd real,
+  tier text not null default 'estimated' check (
+    tier = 'estimated'
+  ),
+  method text not null,
+  primary key (
+    track_id,
+    captured_on,
+    country
+  )
+);
+
