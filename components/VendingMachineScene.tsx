@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import GUI from "lil-gui";
 import * as THREE from "three";
 
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -14,14 +15,11 @@ import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { VignetteShader } from "three/addons/shaders/VignetteShader.js";
 import { ColorCorrectionShader } from "three/addons/shaders/ColorCorrectionShader.js";
 
-const SITE_BG = 0x0b0b0c;
-
 /**
- * Served asset: public/vending_machine.glb (5.36 MB, 55 meshes).
- * Root vending_machine_optimized*.glb are still empty Blender stubs
- * (236 / 132 bytes, no meshes) — cannot be the scene source.
+ * Served asset: public/vending_machine_optimized.glb
+ * (copy of vending_machine_optimized._lights_full.glb).
  */
-const MODEL_URL = "/vending_machine.glb";
+const MODEL_URL = "/vending_machine_optimized.glb";
 
 const SHELF_NAMES = [
   "polySurface263",
@@ -33,33 +31,63 @@ const SHELF_NAMES = [
 
 const GLASS_MESH = "pCube413_lambert1_0";
 
-const PLANE_SIZE = 0.3;
+const CARDS_PER_ROW = 4;
 
-const SLIDE_DISTANCE = 0.26;
+const ICON_TEX_SIZE = 128;
 
-const SLIDE_MS = 280;
+/** Superellipse exponent — iOS continuous-corner feel. */
+const SQUIRCLE_N = 5;
 
-const FALL_MS = 560;
+const CARD_DEPTH = 0.032;
 
-const PLANE_COLOR = 0x9a9aa0;
+const BASE_CARD_SIZE = 0.34;
+
+const SLIDE_MS = 900;
+
+const FALL_MS = 720;
+
+const SLIDE_DISTANCE = 0.32;
 
 /** ~50mm full-frame equivalent. */
 const FOCAL_LENGTH_MM = 50;
 
 const FILM_GAUGE_MM = 36;
 
-/** Green blinker pulse (Hz). */
-const BLINK_HZ = 1.35;
+const ICON_POOL_LIMIT = 40;
 
-type AnimPhase = "idle" | "slide" | "fall" | "done";
+type AnimPhase = "slide" | "fall";
 
-type PlaneAnim = {
-  mesh: THREE.Mesh;
+type RowTune = {
+  spacing: number;
+  x: number;
+  y: number;
+  z: number;
+  cardSize: number;
+  depthGap: number;
+};
+
+type CardPair = {
+  front: THREE.Mesh;
+  back: THREE.Mesh;
+  row: number;
+  slot: number;
+  frontHome: THREE.Vector3;
+  backHome: THREE.Vector3;
+  busy: boolean;
+};
+
+type PairAnim = {
+  pair: CardPair;
   phase: AnimPhase;
   t0: number;
-  start: THREE.Vector3;
-  slideEnd: THREE.Vector3;
+  frontStart: THREE.Vector3;
+  backStart: THREE.Vector3;
+  slideEndFront: THREE.Vector3;
+  slideEndBack: THREE.Vector3;
   fallEnd: THREE.Vector3;
+  rotAxis: THREE.Vector3;
+  rotAmount: number;
+  baseQuat: THREE.Quaternion;
 };
 
 function easeOutCubic(t: number): number {
@@ -68,6 +96,152 @@ function easeOutCubic(t: number): number {
 
 function easeInQuad(t: number): number {
   return t * t;
+}
+
+function squirclePoint(half: number, t: number, n: number): THREE.Vector2 {
+  const ang = t * Math.PI * 2;
+  const c = Math.cos(ang);
+  const s = Math.sin(ang);
+  const exp = 2 / n;
+
+  return new THREE.Vector2(
+    half * Math.sign(c) * Math.pow(Math.abs(c), exp),
+    half * Math.sign(s) * Math.pow(Math.abs(s), exp),
+  );
+}
+
+function makeSquircleShape(size: number, n = SQUIRCLE_N): THREE.Shape {
+  const half = size / 2;
+  const segments = 64;
+  const shape = new THREE.Shape();
+
+  for (let i = 0; i <= segments; i += 1) {
+    const p = squirclePoint(half, i / segments, n);
+
+    if (i === 0) {
+      shape.moveTo(p.x, p.y);
+    } else {
+      shape.lineTo(p.x, p.y);
+    }
+  }
+
+  return shape;
+}
+
+function makeCardGeometry(size: number): THREE.ExtrudeGeometry {
+  const shape = makeSquircleShape(size);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: CARD_DEPTH,
+    bevelEnabled: true,
+    bevelThickness: CARD_DEPTH * 0.28,
+    bevelSize: size * 0.018,
+    bevelOffset: 0,
+    bevelSegments: 2,
+    curveSegments: 20,
+  });
+
+  geo.center();
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function squircleAlphaMask(ctx: CanvasRenderingContext2D, size: number) {
+  const half = size / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  const segments = 64;
+
+  ctx.beginPath();
+
+  for (let i = 0; i <= segments; i += 1) {
+    const p = squirclePoint(half, i / segments, SQUIRCLE_N);
+
+    if (i === 0) {
+      ctx.moveTo(cx + p.x, cy - p.y);
+    } else {
+      ctx.lineTo(cx + p.x, cy - p.y);
+    }
+  }
+
+  ctx.closePath();
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`icon load failed: ${url}`));
+    img.src = url;
+  });
+}
+
+async function bakeIconTexture(
+  url: string,
+  size: number,
+): Promise<THREE.CanvasTexture> {
+  const img = await loadImage(url);
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+
+  if (!ctx) {
+    throw new Error("2d context unavailable");
+  }
+
+  ctx.clearRect(0, 0, size, size);
+  squircleAlphaMask(ctx, size);
+  ctx.clip();
+  ctx.drawImage(img, 0, 0, size, size);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  tex.userData.ownsTexture = true;
+  tex.userData.canvas = canvas;
+
+  return tex;
+}
+
+async function loadIconPool(
+  limit: number,
+): Promise<{ textures: THREE.Texture[]; count: number }> {
+  const res = await fetch(`/api/vending-icons?limit=${limit}`);
+
+  if (!res.ok) {
+    throw new Error(`vending-icons ${res.status}`);
+  }
+
+  const body = (await res.json()) as {
+    count: number;
+    icons: Array<{ trackId: number; src: string; name: string }>;
+  };
+
+  console.info(
+    `[vending] loading ${body.icons.length} popular icons (api count=${body.count})`,
+  );
+
+  const settled = await Promise.allSettled(
+    body.icons.map((icon) => bakeIconTexture(icon.src, ICON_TEX_SIZE)),
+  );
+
+  const textures: THREE.Texture[] = [];
+
+  for (let i = 0; i < settled.length; i += 1) {
+    const result = settled[i];
+
+    if (result.status === "fulfilled") {
+      textures.push(result.value);
+    } else {
+      console.warn("[vending] skip icon", body.icons[i].trackId, result.reason);
+    }
+  }
+
+  console.info(`[vending] baked ${textures.length} icon textures`);
+
+  return { textures, count: textures.length };
 }
 
 function disposeOwned(root: THREE.Object3D) {
@@ -118,7 +292,7 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
     const glass = m.clone();
     glass.userData.ownsClone = true;
     glass.transparent = true;
-    glass.opacity = 0.18;
+    glass.opacity = 0.12;
     glass.depthWrite = false;
     glass.side = THREE.DoubleSide;
 
@@ -143,213 +317,21 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   return cloned;
 }
 
-function isLightMeshName(name: string): boolean {
-  return /light/i.test(name);
-}
-
-function isBlinkMeshName(name: string): boolean {
-  return /blink/i.test(name);
-}
-
-function makeNeonMaterial(
-  color: number,
-  intensity: number,
-): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x111111,
-    emissive: new THREE.Color(color),
-    emissiveIntensity: intensity,
-    roughness: 1,
-    metalness: 0,
+/** Cap face: Basic so icons stay readable under soft global light. */
+function makeCardFaceMaterial(
+  map: THREE.Texture | null,
+): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    map: map ?? null,
+    transparent: true,
+    alphaTest: 0.05,
+    depthWrite: true,
     toneMapped: false,
+    side: THREE.DoubleSide,
   });
   mat.userData.ownsClone = true;
-  mat.userData.isNeon = true;
   return mat;
-}
-
-/** Fixture-owned point light — same color/position as its neon mesh. */
-function attachFixtureLight(
-  mesh: THREE.Mesh,
-  color: number,
-  intensity: number,
-): THREE.PointLight {
-  const light = new THREE.PointLight(color, intensity, 5.5, 2);
-  light.name = `${mesh.name}_pt`;
-  light.castShadow = false;
-  mesh.add(light);
-  mesh.userData.fixtureLight = light;
-  return light;
-}
-
-/**
- * Optimized lights GLB is empty — install neon fixtures along the
- * glass bay to match the reference interior LED frame + blinker.
- */
-function installNeonFixtures(
-  root: THREE.Object3D,
-  glassBox: THREE.Box3,
-): { whites: THREE.Mesh[]; blink: THREE.Mesh | null; owned: THREE.Material[] } {
-  const owned: THREE.Material[] = [];
-  const whites: THREE.Mesh[] = [];
-  const group = new THREE.Group();
-  group.name = "lights";
-
-  const toLocal = (x: number, y: number, z: number) =>
-    root.worldToLocal(new THREE.Vector3(x, y, z));
-
-  const gx0 = glassBox.min.x + 0.06;
-  const gx1 = glassBox.max.x - 0.06;
-  const gy0 = glassBox.min.y + 0.08;
-  const gy1 = glassBox.max.y - 0.06;
-  const gz = glassBox.min.z + 0.04;
-  const spanX = gx1 - gx0;
-  const spanY = gy1 - gy0;
-  const tube = 0.04;
-
-  const specs: {
-    name: string;
-    w: number;
-    h: number;
-    d: number;
-    x: number;
-    y: number;
-    z: number;
-  }[] = [
-    {
-      name: "light",
-      w: spanX,
-      h: tube,
-      d: tube,
-      x: (gx0 + gx1) / 2,
-      y: gy1,
-      z: gz,
-    },
-    {
-      name: "light.001",
-      w: tube,
-      h: spanY,
-      d: tube,
-      x: gx0,
-      y: (gy0 + gy1) / 2,
-      z: gz,
-    },
-    {
-      name: "light.002",
-      w: tube,
-      h: spanY,
-      d: tube,
-      x: gx1,
-      y: (gy0 + gy1) / 2,
-      z: gz,
-    },
-    {
-      name: "light.003",
-      w: spanX * 0.92,
-      h: tube,
-      d: tube,
-      x: (gx0 + gx1) / 2,
-      y: gy0 + 0.12,
-      z: gz,
-    },
-  ];
-
-  for (const s of specs) {
-    const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
-    const mat = makeNeonMaterial(0xffffff, 1.8);
-    owned.push(mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = s.name;
-    mesh.position.copy(toLocal(s.x, s.y, s.z));
-    mesh.userData.ownsGeometry = true;
-    mesh.userData.isNeon = true;
-    attachFixtureLight(mesh, 0xfff5e6, 3.6);
-    group.add(mesh);
-    whites.push(mesh);
-  }
-
-  const blinkMat = makeNeonMaterial(0x39ff14, 2.8);
-  owned.push(blinkMat);
-  const blinkGeo = new THREE.SphereGeometry(0.05, 12, 12);
-  const blink = new THREE.Mesh(blinkGeo, blinkMat);
-  blink.name = "light_blink";
-
-  // status LED on the control fascia (model −X of glass)
-  blink.position.copy(
-    toLocal(
-      glassBox.min.x - 0.42,
-      glassBox.min.y + spanY * 0.18,
-      glassBox.min.z - 0.02,
-    ),
-  );
-
-  blink.userData.ownsGeometry = true;
-  blink.userData.isNeon = true;
-  blink.userData.isBlink = true;
-  attachFixtureLight(blink, 0x39ff14, 2.2);
-  group.add(blink);
-
-  root.add(group);
-
-  return { whites, blink, owned };
-}
-
-function collectOrInstallLights(
-  root: THREE.Object3D,
-  glassBox: THREE.Box3,
-): {
-  whites: THREE.Mesh[];
-  blink: THREE.Mesh | null;
-  owned: THREE.Material[];
-  source: "model" | "fixtures";
-} {
-  const whites: THREE.Mesh[] = [];
-  const blinkFound: THREE.Mesh[] = [];
-
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-
-    if (!mesh.isMesh) {
-      return;
-    }
-
-    if (isBlinkMeshName(mesh.name)) {
-      blinkFound.push(mesh);
-      return;
-    }
-
-    if (isLightMeshName(mesh.name)) {
-      whites.push(mesh);
-    }
-  });
-
-  const blink = blinkFound[0] ?? null;
-
-  if (whites.length === 0 && !blink) {
-    const installed = installNeonFixtures(root, glassBox);
-    return { ...installed, source: "fixtures" };
-  }
-
-  const owned: THREE.Material[] = [];
-
-  for (const mesh of whites) {
-    const mat = makeNeonMaterial(0xffffff, 1.8);
-    owned.push(mat);
-    mesh.material = mat;
-    mesh.userData.isNeon = true;
-    attachFixtureLight(mesh, 0xfff5e6, 3.6);
-  }
-
-  if (blink) {
-    const mat = makeNeonMaterial(0x39ff14, 2.8);
-    owned.push(mat);
-    blink.material = mat;
-    blink.userData.isNeon = true;
-    blink.userData.isBlink = true;
-    attachFixtureLight(blink, 0x39ff14, 2.2);
-  }
-
-  return { whites, blink, owned, source: "model" };
 }
 
 export function VendingMachineScene() {
@@ -366,10 +348,9 @@ export function VendingMachineScene() {
 
     let disposed = false;
     let frameId = 0;
-    let binLanded = 0;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(SITE_BG);
+    scene.background = null;
 
     const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
     camera.filmGauge = FILM_GAUGE_MM;
@@ -377,7 +358,8 @@ export function VendingMachineScene() {
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
-      alpha: false,
+      alpha: true,
+      premultipliedAlpha: true,
       powerPreference: "high-performance",
       preserveDrawingBuffer: true,
     });
@@ -385,44 +367,63 @@ export function VendingMachineScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
-    renderer.setClearColor(SITE_BG, 1);
+    renderer.toneMappingExposure = 1.2;
+    renderer.autoClear = true;
+    renderer.setClearColor(0x000000, 0);
     mount.appendChild(renderer.domElement);
 
     const canvas = renderer.domElement;
     canvas.style.display = "block";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
+    canvas.style.background = "transparent";
 
-    // illumination only from fixture-owned PointLights (no Ambient/Hemi/Dir)
+    // soft global fill — even, readable, page-blend
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+    const hemiLight = new THREE.HemisphereLight(0xf0f2f5, 0x2c2c30, 0.95);
+    hemiLight.position.set(0, 14, 0);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
+    keyLight.position.set(-2.5, 8, -14);
+    scene.add(ambientLight, hemiLight, keyLight);
 
     const composer = new EffectComposer(renderer);
+    // EffectComposer flips autoClear — restore for the direct-render path
+    renderer.autoClear = true;
+    renderer.setClearColor(0x000000, 0);
+
     const renderPass = new RenderPass(scene, camera);
+    renderPass.clear = true;
+    renderPass.clearAlpha = 0;
     composer.addPass(renderPass);
 
+    // mild / off by default so alpha stays clean
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(1, 1),
-      0.35,
-      0.6,
-      0.85,
+      0,
+      0.4,
+      0.9,
     );
+    bloomPass.enabled = false;
     composer.addPass(bloomPass);
 
     const bokehPass = new BokehPass(scene, camera, {
       focus: 14,
-      aperture: 0.00008,
-      maxblur: 0.002,
+      aperture: 0.00004,
+      maxblur: 0,
     });
+    bokehPass.enabled = false;
     composer.addPass(bokehPass);
 
     const colorPass = new ShaderPass(ColorCorrectionShader);
-    colorPass.uniforms.powRGB.value = new THREE.Vector3(1.08, 1.06, 1.1);
-    colorPass.uniforms.mulRGB.value = new THREE.Vector3(0.92, 0.93, 0.96);
+    colorPass.uniforms.powRGB.value = new THREE.Vector3(1.0, 1.0, 1.0);
+    colorPass.uniforms.mulRGB.value = new THREE.Vector3(1.0, 1.0, 1.0);
+    colorPass.enabled = false;
     composer.addPass(colorPass);
 
     const vignettePass = new ShaderPass(VignetteShader);
-    vignettePass.uniforms.offset.value = 0.95;
-    vignettePass.uniforms.darkness.value = 0.85;
+    vignettePass.uniforms.offset.value = 1.0;
+    vignettePass.uniforms.darkness.value = 0;
+    vignettePass.enabled = false;
     composer.addPass(vignettePass);
 
     const outputPass = new OutputPass();
@@ -430,76 +431,466 @@ export function VendingMachineScene() {
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const clickables: THREE.Mesh[] = [];
-    const animations: PlaneAnim[] = [];
-    const planeGeo = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
+    const pairs: CardPair[] = [];
+    const animations: PairAnim[] = [];
     const ownedMats: THREE.Material[] = [];
+    const ownedTextures: THREE.Texture[] = [];
 
+    let cardGeo = makeCardGeometry(BASE_CARD_SIZE);
     let modelRoot: THREE.Object3D | null = null;
     let fitted = false;
-    let blinkMesh: THREE.Mesh | null = null;
-    let blinkBaseIntensity = 2.8;
-    let blinkLightBase = 2.2;
+    let cameraLocked = false;
+    let iconTextures: THREE.Texture[] = [];
+    let shelfSeats: Array<{ y: number; z: number }> = [];
+    let bayMinX = 0;
+    let bayMaxX = 0;
+    let gui: GUI | null = null;
 
     const outAxis = new THREE.Vector3(0, 0, -1);
-    const binBase = new THREE.Vector3();
+    const lookTarget = new THREE.Vector3();
 
-    function centerModel(root: THREE.Object3D) {
-      root.updateMatrixWorld(true);
-      const box = new THREE.Box3().setFromObject(root);
-      const center = box.getCenter(new THREE.Vector3());
-      root.position.sub(center);
-      root.updateMatrixWorld(true);
+    const rows: RowTune[] = SHELF_NAMES.map(() => ({
+      spacing: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      cardSize: BASE_CARD_SIZE,
+      depthGap: 0.07,
+    }));
+
+    function shelfSeat(
+      index: number,
+      count: number,
+      glassBox: THREE.Box3,
+    ): { y: number; z: number } {
+      // empty Maya transforms sit at bogus world X — seat from glass bay
+      const top = glassBox.max.y - 0.42;
+      const bottom = glassBox.min.y + 0.78;
+      const t = count <= 1 ? 0 : index / (count - 1);
+      const y = top - t * (top - bottom);
+      const z = glassBox.min.z + 0.1;
+      return { y, z };
+    }
+
+    const camTune = {
+      x: 0,
+      y: 0,
+      z: 0,
+      tx: 0,
+      ty: 0,
+      tz: 0,
+      focalLength: FOCAL_LENGTH_MM,
+      yaw: 9,
+      pitch: -6,
+    };
+
+    const postTune = {
+      bloomStrength: 0,
+      bloomRadius: 0.4,
+      bloomThreshold: 0.9,
+      vignetteOffset: 1.0,
+      vignetteDarkness: 0,
+      colorPow: 1.0,
+      colorMul: 1.0,
+      focus: 14,
+      aperture: 0.00004,
+      maxblur: 0,
+      exposure: 1.2,
+    };
+
+    const lightTune = {
+      ambient: 0.85,
+      hemi: 0.95,
+      key: 1.35,
+      ambientColor: "#ffffff",
+      hemiSky: "#f0f2f5",
+      hemiGround: "#2c2c30",
+      keyColor: "#ffffff",
+    };
+
+    function pickTexture(exclude?: THREE.Texture | null): THREE.Texture | null {
+      if (iconTextures.length === 0) {
+        return null;
+      }
+
+      if (iconTextures.length === 1) {
+        return iconTextures[0];
+      }
+
+      let tex = iconTextures[Math.floor(Math.random() * iconTextures.length)];
+
+      for (let i = 0; i < 6 && tex === exclude; i += 1) {
+        tex = iconTextures[Math.floor(Math.random() * iconTextures.length)];
+      }
+
+      return tex;
+    }
+
+    function assignMap(mesh: THREE.Mesh, tex: THREE.Texture | null) {
+      const mat = mesh.material as THREE.MeshBasicMaterial;
+      mat.map = tex;
+      mat.needsUpdate = true;
+    }
+
+    function applyCardScale(mesh: THREE.Mesh, size: number) {
+      const s = size / BASE_CARD_SIZE;
+      mesh.scale.set(s, s, 1);
+    }
+
+    // Extrude cap faces +Z; rotate so icon faces machine front (−Z).
+    function faceCamera(mesh: THREE.Mesh) {
+      mesh.rotation.set(0, Math.PI, 0);
+      mesh.quaternion.setFromEuler(mesh.rotation);
+    }
+
+    function layoutCards() {
+      if (!modelRoot || shelfSeats.length === 0) {
+        return;
+      }
+
+      const toLocal = (world: THREE.Vector3) =>
+        modelRoot!.worldToLocal(world.clone());
+
+      for (const pair of pairs) {
+        const row = rows[pair.row];
+        const seat = shelfSeats[pair.row];
+        const bayW = bayMaxX - bayMinX;
+        const spacing =
+          row.spacing > 0.001 ? row.spacing : bayW / (CARDS_PER_ROW + 0.35);
+        const span = spacing * (CARDS_PER_ROW - 1);
+        const startX = (bayMinX + bayMaxX) / 2 - span / 2;
+        const wx = startX + pair.slot * spacing + row.x;
+        const seatY = seat.y + row.cardSize / 2 + row.y;
+        const seatZ = seat.z + row.z;
+
+        if (![wx, seatY, seatZ].every(Number.isFinite)) {
+          continue;
+        }
+
+        const frontWorld = new THREE.Vector3(wx, seatY, seatZ);
+        const backWorld = new THREE.Vector3(wx, seatY, seatZ + row.depthGap);
+
+        pair.frontHome.copy(toLocal(frontWorld));
+        pair.backHome.copy(toLocal(backWorld));
+
+        if (!pair.busy) {
+          pair.front.position.copy(pair.frontHome);
+          pair.back.position.copy(pair.backHome);
+          faceCamera(pair.front);
+          faceCamera(pair.back);
+          applyCardScale(pair.front, row.cardSize);
+          applyCardScale(pair.back, row.cardSize);
+        }
+      }
+    }
+
+    function placeCards(root: THREE.Object3D) {
+      const glass = root.getObjectByName(GLASS_MESH);
+      const glassBox = glass
+        ? new THREE.Box3().setFromObject(glass)
+        : new THREE.Box3().setFromObject(root);
+
+      if (
+        glassBox.isEmpty() ||
+        ![glassBox.min.y, glassBox.max.y, glassBox.min.z].every(Number.isFinite)
+      ) {
+        console.warn("[vending] glass bounds unusable");
+        return;
+      }
+
+      const count = SHELF_NAMES.length;
+      shelfSeats = [];
+
+      for (let i = 0; i < count; i += 1) {
+        shelfSeats.push(shelfSeat(i, count, glassBox));
+      }
+
+      bayMinX = Number.isFinite(glassBox.min.x)
+        ? glassBox.min.x + 0.32
+        : -1.2;
+      bayMaxX = Number.isFinite(glassBox.max.x)
+        ? glassBox.max.x - 0.55
+        : 1.2;
+
+      if (![bayMinX, bayMaxX].every(Number.isFinite) || bayMaxX <= bayMinX) {
+        bayMinX = -1.2;
+        bayMaxX = 1.2;
+      }
+
+      console.info(
+        `[vending] seats=${shelfSeats.map((s) => s.y.toFixed(2)).join(",")}`,
+      );
+
+      for (let s = 0; s < shelfSeats.length; s += 1) {
+        for (let i = 0; i < CARDS_PER_ROW; i += 1) {
+          const frontTex = pickTexture();
+          const backTex = pickTexture(frontTex);
+          const faceA = makeCardFaceMaterial(frontTex);
+          const faceB = makeCardFaceMaterial(backTex);
+          ownedMats.push(faceA, faceB);
+
+          // one material — ExtrudeGeometry multi-material UVs hide the icon on caps
+          const front = new THREE.Mesh(cardGeo, faceA);
+          const back = new THREE.Mesh(cardGeo, faceB);
+
+          front.renderOrder = 2;
+          back.renderOrder = 1;
+          front.userData.clickable = true;
+          back.userData.clickable = false;
+          front.userData.role = "front";
+          back.userData.role = "back";
+
+          root.add(front);
+          root.add(back);
+
+          const pair: CardPair = {
+            front,
+            back,
+            row: s,
+            slot: i,
+            frontHome: new THREE.Vector3(),
+            backHome: new THREE.Vector3(),
+            busy: false,
+          };
+
+          front.userData.pair = pair;
+          back.userData.pair = pair;
+          pairs.push(pair);
+        }
+      }
+
+      layoutCards();
+    }
+
+    function applyCameraFromTune() {
+      camera.filmGauge = FILM_GAUGE_MM;
+      camera.setFocalLength(camTune.focalLength);
+      camera.updateProjectionMatrix();
+      camera.position.set(camTune.x, camTune.y, camTune.z);
+      lookTarget.set(camTune.tx, camTune.ty, camTune.tz);
+      camera.lookAt(lookTarget);
+
+      const focusUniform = bokehPass.uniforms as {
+        focus: { value: number };
+      };
+      focusUniform.focus.value = postTune.focus;
     }
 
     function fitCamera(root: THREE.Object3D) {
+      if (cameraLocked) {
+        applyCameraFromTune();
+        return;
+      }
+
+      // exclude cards from framing so NaN seats never poison the camera
+      const prevVis: Array<{ obj: THREE.Object3D; v: boolean }> = [];
+      for (const pair of pairs) {
+        prevVis.push({ obj: pair.front, v: pair.front.visible });
+        prevVis.push({ obj: pair.back, v: pair.back.visible });
+        pair.front.visible = false;
+        pair.back.visible = false;
+      }
+
       const box = new THREE.Box3().setFromObject(root);
+
+      for (const entry of prevVis) {
+        entry.obj.visible = entry.v;
+      }
+
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
+
+      if (
+        box.isEmpty() ||
+        ![size.x, size.y, size.z, center.x, center.y, center.z].every(
+          Number.isFinite,
+        )
+      ) {
+        console.warn("[vending] fitCamera: invalid model bounds");
+        return;
+      }
 
       const aspect = mount.clientWidth / Math.max(mount.clientHeight, 1);
       camera.aspect = aspect;
       camera.filmGauge = FILM_GAUGE_MM;
-      camera.setFocalLength(FOCAL_LENGTH_MM);
+      camera.setFocalLength(camTune.focalLength);
       camera.updateProjectionMatrix();
 
-      // distance from vertical FOV to frame machine with margin
       const vFov = THREE.MathUtils.degToRad(camera.fov);
+      // slight overscan so feet + flap stay in frame; leave headroom for sticky header
       const fitH = size.y * 1.18;
-      const fitW = size.x * 1.28;
+      const fitW = size.x * 1.22;
       const distH = fitH / (2 * Math.tan(vFov / 2));
       const distW = fitW / (2 * Math.tan(vFov / 2) * aspect);
-      const dist = Math.max(distH, distW);
+      let dist = Math.max(distH, distW);
 
-      // composed front: slight yaw + downward look, still −Z hemisphere
-      const yaw = THREE.MathUtils.degToRad(9);
-      const pitch = THREE.MathUtils.degToRad(-6);
+      if (!Number.isFinite(dist) || dist < 0.5) {
+        dist = 16;
+      }
+
+      const yaw = THREE.MathUtils.degToRad(camTune.yaw);
+      const pitch = THREE.MathUtils.degToRad(camTune.pitch);
       const front = new THREE.Vector3(
-        Math.sin(yaw) * dist * 0.35,
-        Math.sin(-pitch) * dist * 0.25 + size.y * 0.06,
+        Math.sin(yaw) * dist * 0.32,
+        Math.sin(-pitch) * dist * 0.22 + size.y * 0.02,
         -Math.cos(yaw) * dist,
       );
 
-      camera.position.set(
-        center.x + front.x,
-        center.y + front.y,
-        center.z + front.z,
-      );
+      camTune.x = center.x + front.x;
+      camTune.y = center.y + front.y;
+      camTune.z = center.z + front.z;
+      camTune.tx = center.x + size.x * 0.03;
+      camTune.ty = center.y - size.y * 0.04;
+      camTune.tz = center.z;
 
-      // look below center so sticky header clears the crown
-      camera.lookAt(
-        center.x + size.x * 0.04,
-        center.y - size.y * 0.08,
-        center.z,
-      );
-
+      camera.position.set(camTune.x, camTune.y, camTune.z);
       const focusDist = camera.position.distanceTo(
-        new THREE.Vector3(center.x, center.y + size.y * 0.05, center.z + box.min.z),
+        new THREE.Vector3(
+          center.x,
+          center.y + size.y * 0.05,
+          center.z + box.min.z,
+        ),
       );
-      const focusUniform = bokehPass.uniforms as {
+
+      postTune.focus = Number.isFinite(focusDist) ? focusDist : dist;
+      applyCameraFromTune();
+      cameraLocked = true;
+    }
+
+    function postActive(): boolean {
+      return (
+        bloomPass.enabled ||
+        bokehPass.enabled ||
+        vignettePass.enabled ||
+        colorPass.enabled
+      );
+    }
+
+    function applyPostTune() {
+      bloomPass.strength = postTune.bloomStrength;
+      bloomPass.radius = postTune.bloomRadius;
+      bloomPass.threshold = postTune.bloomThreshold;
+      bloomPass.enabled = postTune.bloomStrength > 0.001;
+      vignettePass.uniforms.offset.value = postTune.vignetteOffset;
+      vignettePass.uniforms.darkness.value = postTune.vignetteDarkness;
+      vignettePass.enabled = postTune.vignetteDarkness > 0.001;
+      colorPass.uniforms.powRGB.value.set(
+        postTune.colorPow,
+        postTune.colorPow * 0.98,
+        postTune.colorPow * 1.02,
+      );
+      colorPass.uniforms.mulRGB.value.set(
+        postTune.colorMul,
+        postTune.colorMul * 1.01,
+        postTune.colorMul * 1.03,
+      );
+      colorPass.enabled =
+        Math.abs(postTune.colorPow - 1) > 0.001 ||
+        Math.abs(postTune.colorMul - 1) > 0.001;
+
+      const bokehUniforms = bokehPass.uniforms as {
         focus: { value: number };
+        aperture: { value: number };
+        maxblur: { value: number };
       };
-      focusUniform.focus.value = focusDist;
+      bokehUniforms.focus.value = postTune.focus;
+      bokehUniforms.aperture.value = postTune.aperture;
+      bokehUniforms.maxblur.value = postTune.maxblur;
+      bokehPass.enabled = postTune.maxblur > 0.0005;
+      renderer.toneMappingExposure = postTune.exposure;
+    }
+
+    function buildGui() {
+      gui = new GUI({ title: "Vending tune" });
+      gui.domElement.style.zIndex = "40";
+
+      const camFolder = gui.addFolder("Camera");
+      camFolder.add(camTune, "x", -20, 20, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "y", -20, 20, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "z", -30, 30, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "tx", -10, 10, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "ty", -10, 10, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "tz", -10, 10, 0.01).onChange(applyCameraFromTune);
+      camFolder
+        .add(camTune, "focalLength", 24, 85, 0.5)
+        .name("focal mm")
+        .onChange(applyCameraFromTune);
+      camFolder.add(camTune, "yaw", -35, 35, 0.1).onChange(() => {
+        cameraLocked = false;
+        if (modelRoot) {
+          fitCamera(modelRoot);
+        }
+      });
+      camFolder.add(camTune, "pitch", -35, 35, 0.1).onChange(() => {
+        cameraLocked = false;
+        if (modelRoot) {
+          fitCamera(modelRoot);
+        }
+      });
+
+      const postFolder = gui.addFolder("Post");
+      postFolder
+        .add(postTune, "bloomStrength", 0, 2, 0.01)
+        .onChange(applyPostTune);
+      postFolder
+        .add(postTune, "bloomRadius", 0, 1.5, 0.01)
+        .onChange(applyPostTune);
+      postFolder
+        .add(postTune, "bloomThreshold", 0, 1, 0.01)
+        .onChange(applyPostTune);
+      postFolder
+        .add(postTune, "vignetteOffset", 0, 2, 0.01)
+        .onChange(applyPostTune);
+      postFolder
+        .add(postTune, "vignetteDarkness", 0, 2, 0.01)
+        .onChange(applyPostTune);
+      postFolder.add(postTune, "colorPow", 0.5, 2, 0.01).onChange(applyPostTune);
+      postFolder.add(postTune, "colorMul", 0.4, 1.5, 0.01).onChange(applyPostTune);
+      postFolder.add(postTune, "focus", 1, 40, 0.01).onChange(applyPostTune);
+      postFolder
+        .add(postTune, "aperture", 0.00001, 0.001, 0.00001)
+        .onChange(applyPostTune);
+      postFolder
+        .add(postTune, "maxblur", 0, 0.02, 0.0001)
+        .onChange(applyPostTune);
+      postFolder.add(postTune, "exposure", 0.2, 2, 0.01).onChange(applyPostTune);
+
+      rows.forEach((row, i) => {
+        const f = gui!.addFolder(`Row ${i + 1}`);
+        f.add(row, "spacing", 0, 1.2, 0.005).onChange(layoutCards);
+        f.add(row, "x", -1.5, 1.5, 0.005).onChange(layoutCards);
+        f.add(row, "y", -1.5, 1.5, 0.005).onChange(layoutCards);
+        f.add(row, "z", -1.5, 1.5, 0.005).onChange(layoutCards);
+        f.add(row, "cardSize", 0.1, 0.55, 0.005).onChange(layoutCards);
+        f.add(row, "depthGap", 0.02, 0.25, 0.005).onChange(layoutCards);
+      });
+
+      const lightFolder = gui.addFolder("Lights");
+      lightFolder
+        .add(lightTune, "ambient", 0, 2.5, 0.01)
+        .onChange((v: number) => {
+          ambientLight.intensity = v;
+        });
+      lightFolder.add(lightTune, "hemi", 0, 2.5, 0.01).onChange((v: number) => {
+        hemiLight.intensity = v;
+      });
+      lightFolder.add(lightTune, "key", 0, 3, 0.01).onChange((v: number) => {
+        keyLight.intensity = v;
+      });
+      lightFolder.addColor(lightTune, "ambientColor").onChange((v: string) => {
+        ambientLight.color.set(v);
+      });
+      lightFolder.addColor(lightTune, "hemiSky").onChange((v: string) => {
+        hemiLight.color.set(v);
+      });
+      lightFolder.addColor(lightTune, "hemiGround").onChange((v: string) => {
+        hemiLight.groundColor.set(v);
+      });
+      lightFolder.addColor(lightTune, "keyColor").onChange((v: string) => {
+        keyLight.color.set(v);
+      });
+
+      applyPostTune();
     }
 
     function resize() {
@@ -513,93 +904,14 @@ export function VendingMachineScene() {
       renderer.setSize(w, h, false);
       composer.setSize(w, h);
       bloomPass.resolution.set(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
 
       if (modelRoot && fitted) {
-        fitCamera(modelRoot);
-      }
-    }
-
-    function placePlanes(root: THREE.Object3D) {
-      const glass = root.getObjectByName(GLASS_MESH);
-      const glassBox = glass
-        ? new THREE.Box3().setFromObject(glass)
-        : new THREE.Box3();
-
-      const shelves: THREE.Box3[] = [];
-
-      for (const name of SHELF_NAMES) {
-        const node = root.getObjectByName(name);
-
-        if (node) {
-          shelves.push(new THREE.Box3().setFromObject(node));
-        }
-      }
-
-      const toLocal = (world: THREE.Vector3) => root.worldToLocal(world.clone());
-
-      if (!glassBox.isEmpty()) {
-        const gx = glassBox.getCenter(new THREE.Vector3()).x;
-        binBase.copy(
-          toLocal(
-            new THREE.Vector3(
-              gx,
-              glassBox.min.y - 0.95,
-              glassBox.min.z + 0.28,
-            ),
-          ),
-        );
-      } else {
-        binBase.set(0, -3.5, -1.2);
-      }
-
-      const bayMin = !glassBox.isEmpty()
-        ? glassBox.min.x + 0.2
-        : shelves[0].min.x + 0.25;
-      const bayMax = !glassBox.isEmpty()
-        ? glassBox.max.x - 0.2
-        : shelves[0].max.x - 0.25;
-      const bayW = bayMax - bayMin;
-      const slot = bayW / 3;
-      const worldXs = [
-        bayMin + slot * 0.5,
-        bayMin + slot * 1.5,
-        bayMin + slot * 2.5,
-      ];
-
-      for (let s = 0; s < shelves.length; s += 1) {
-        const shelf = shelves[s];
-        const seatZ = shelf.min.z + 0.22;
-        const seatY = shelf.max.y + 0.04;
-
-        for (let i = 0; i < 3; i += 1) {
-          const mat = new THREE.MeshBasicMaterial({
-            color: PLANE_COLOR,
-            side: THREE.FrontSide,
-            depthTest: true,
-            depthWrite: true,
-            toneMapped: false,
-          });
-
-          ownedMats.push(mat);
-
-          const mesh = new THREE.Mesh(planeGeo, mat);
-          mesh.rotation.y = Math.PI;
-
-          const local = toLocal(
-            new THREE.Vector3(
-              worldXs[i],
-              seatY + PLANE_SIZE / 2,
-              seatZ,
-            ),
-          );
-
-          mesh.position.copy(local);
-          mesh.renderOrder = 1;
-          mesh.userData.shelfIndex = s;
-          mesh.userData.slotIndex = i;
-          mesh.userData.clickable = true;
-          root.add(mesh);
-          clickables.push(mesh);
+        if (!cameraLocked) {
+          fitCamera(modelRoot);
+        } else {
+          applyCameraFromTune();
         }
       }
     }
@@ -610,16 +922,18 @@ export function VendingMachineScene() {
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     }
 
-    function pickPlane(event: PointerEvent): THREE.Mesh | null {
+    function pickFront(event: PointerEvent): CardPair | null {
       pointerFromEvent(event);
       raycaster.setFromCamera(pointer, camera);
-      const hits = raycaster.intersectObjects(clickables, false);
+      const fronts = pairs.map((p) => p.front);
+      const hits = raycaster.intersectObjects(fronts, false);
 
       for (const hit of hits) {
         const mesh = hit.object as THREE.Mesh;
+        const pair = mesh.userData.pair as CardPair | undefined;
 
-        if (mesh.userData.clickable) {
-          return mesh;
+        if (pair && !pair.busy && mesh.userData.clickable) {
+          return pair;
         }
       }
 
@@ -627,69 +941,108 @@ export function VendingMachineScene() {
     }
 
     function onPointerMove(event: PointerEvent) {
-      canvas.style.cursor = pickPlane(event) ? "pointer" : "default";
+      canvas.style.cursor = pickFront(event) ? "pointer" : "default";
     }
 
-    function startVend(mesh: THREE.Mesh) {
-      const existing = animations.find((a) => a.mesh === mesh);
-
-      if (existing && existing.phase !== "idle" && existing.phase !== "done") {
+    function startPairVend(pair: CardPair) {
+      if (pair.busy) {
         return;
       }
 
-      if (mesh.userData.busy) {
-        return;
-      }
+      pair.busy = true;
+      pair.front.userData.clickable = false;
 
-      mesh.userData.busy = true;
-      mesh.userData.clickable = false;
+      const frontStart = pair.front.position.clone();
+      const backStart = pair.back.position.clone();
+      const slideEndFront = frontStart
+        .clone()
+        .addScaledVector(outAxis, SLIDE_DISTANCE);
+      const slideEndBack = backStart
+        .clone()
+        .addScaledVector(outAxis, SLIDE_DISTANCE);
+      const fallEnd = slideEndFront
+        .clone()
+        .add(new THREE.Vector3(0, -0.55, 0))
+        .addScaledVector(outAxis, 0.08);
 
-      const start = mesh.position.clone();
-      const slideEnd = start.clone().addScaledVector(outAxis, SLIDE_DISTANCE);
-
-      const offsetX = ((binLanded % 3) - 1) * 0.18;
-      const offsetZ = Math.floor(binLanded / 3) * 0.1 * outAxis.z;
-      binLanded += 1;
-
-      const fallEnd = new THREE.Vector3(
-        binBase.x + offsetX,
-        binBase.y + PLANE_SIZE / 2,
-        binBase.z + offsetZ,
-      );
+      const rotAxis = new THREE.Vector3(
+        (Math.random() - 0.5) * 0.6,
+        (Math.random() - 0.5) * 0.35,
+        (Math.random() - 0.5) * 0.6,
+      ).normalize();
+      const rotAmount = THREE.MathUtils.degToRad(8 + Math.random() * 14);
 
       animations.push({
-        mesh,
+        pair,
         phase: "slide",
         t0: performance.now(),
-        start,
-        slideEnd,
+        frontStart,
+        backStart,
+        slideEndFront,
+        slideEndBack,
         fallEnd,
+        rotAxis,
+        rotAmount,
+        baseQuat: pair.front.quaternion.clone(),
       });
     }
 
-    function onPointerDown(event: PointerEvent) {
-      const mesh = pickPlane(event);
+    function finishPair(anim: PairAnim) {
+      const { pair } = anim;
+      const fallen = pair.front;
+      const revealed = pair.back;
+      const revealedMat = revealed.material as THREE.MeshBasicMaterial;
+      const keepMap = revealedMat.map ?? null;
 
-      if (mesh) {
-        startVend(mesh);
+      fallen.position.copy(pair.backHome);
+      revealed.position.copy(pair.frontHome);
+      faceCamera(fallen);
+      faceCamera(revealed);
+      applyCardScale(fallen, rows[pair.row].cardSize);
+      applyCardScale(revealed, rows[pair.row].cardSize);
+
+      pair.front = revealed;
+      pair.back = fallen;
+      revealed.userData.role = "front";
+      fallen.userData.role = "back";
+      revealed.userData.clickable = true;
+      fallen.userData.clickable = false;
+
+      assignMap(fallen, pickTexture(keepMap));
+
+      pair.busy = false;
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      const pair = pickFront(event);
+
+      if (pair) {
+        startPairVend(pair);
       }
     }
 
     function updateAnims(now: number) {
-      for (const anim of animations) {
-        if (anim.phase === "done" || anim.phase === "idle") {
-          continue;
-        }
+      for (let i = animations.length - 1; i >= 0; i -= 1) {
+        const anim = animations[i];
 
         if (anim.phase === "slide") {
           const u = Math.min(1, (now - anim.t0) / SLIDE_MS);
           const e = easeOutCubic(u);
-          anim.mesh.position.lerpVectors(anim.start, anim.slideEnd, e);
+          anim.pair.front.position.lerpVectors(
+            anim.frontStart,
+            anim.slideEndFront,
+            e,
+          );
+          anim.pair.back.position.lerpVectors(
+            anim.backStart,
+            anim.slideEndBack,
+            e,
+          );
 
           if (u >= 1) {
             anim.phase = "fall";
             anim.t0 = now;
-            anim.start.copy(anim.slideEnd);
+            anim.frontStart.copy(anim.slideEndFront);
           }
 
           continue;
@@ -698,32 +1051,23 @@ export function VendingMachineScene() {
         if (anim.phase === "fall") {
           const u = Math.min(1, (now - anim.t0) / FALL_MS);
           const e = easeInQuad(u);
-          anim.mesh.position.lerpVectors(anim.start, anim.fallEnd, e);
-          anim.mesh.rotation.x = e * 0.2;
+          anim.pair.front.position.lerpVectors(
+            anim.frontStart,
+            anim.fallEnd,
+            e,
+          );
+
+          const q = new THREE.Quaternion().setFromAxisAngle(
+            anim.rotAxis,
+            anim.rotAmount * e,
+          );
+          anim.pair.front.quaternion.copy(anim.baseQuat).multiply(q);
 
           if (u >= 1) {
-            anim.mesh.position.copy(anim.fallEnd);
-            anim.phase = "done";
+            finishPair(anim);
+            animations.splice(i, 1);
           }
         }
-      }
-    }
-
-    function updateBlink(now: number) {
-      if (!blinkMesh) {
-        return;
-      }
-
-      const mat = blinkMesh.material as THREE.MeshStandardMaterial;
-      const pulse =
-        0.08 +
-        0.92 * (0.5 + 0.5 * Math.sin(now * 0.001 * Math.PI * 2 * BLINK_HZ));
-      mat.emissiveIntensity = blinkBaseIntensity * pulse;
-
-      const pt = blinkMesh.userData.fixtureLight as THREE.PointLight | undefined;
-
-      if (pt) {
-        pt.intensity = blinkLightBase * pulse;
       }
     }
 
@@ -734,54 +1078,105 @@ export function VendingMachineScene() {
 
       frameId = requestAnimationFrame(animate);
       updateAnims(now);
-      updateBlink(now);
-      composer.render();
+
+      // composer passes destroy canvas alpha — direct path when post is off
+      if (postActive()) {
+        composer.render();
+      } else {
+        renderer.setRenderTarget(null);
+        renderer.autoClear = true;
+        renderer.setClearColor(0x000000, 0);
+        renderer.clear(true, true, true);
+        renderer.render(scene, camera);
+      }
     }
+
+    // debug hook for verification
+    (window as unknown as { __vending?: object }).__vending = {
+      scene,
+      camera,
+      composer,
+      pairs,
+      modelUrl: MODEL_URL,
+      lightTune,
+      postTune,
+    };
 
     const loader = new GLTFLoader();
 
-    loader.load(
-      MODEL_URL,
-      (gltf) => {
+    void (async () => {
+      try {
+        const pool = await loadIconPool(ICON_POOL_LIMIT);
+
         if (disposed) {
-          disposeOwned(gltf.scene);
+          pool.textures.forEach((t) => t.dispose());
           return;
         }
 
-        modelRoot = gltf.scene;
-        scene.add(modelRoot);
-        centerModel(modelRoot);
+        iconTextures = pool.textures;
+        ownedTextures.push(...pool.textures);
+      } catch (err) {
+        console.error("[vending] icon pool failed", err);
+      }
 
-        ownedMats.push(...openFrontGlass(modelRoot));
+      if (disposed) {
+        return;
+      }
 
-        const glass = modelRoot.getObjectByName(GLASS_MESH);
-        const glassBox = glass
-          ? new THREE.Box3().setFromObject(glass)
-          : new THREE.Box3().setFromObject(modelRoot);
+      loader.load(
+        MODEL_URL,
+        (gltf) => {
+          if (disposed) {
+            disposeOwned(gltf.scene);
+            return;
+          }
 
-        const lights = collectOrInstallLights(modelRoot, glassBox);
-        ownedMats.push(...lights.owned);
-        blinkMesh = lights.blink;
+          modelRoot = gltf.scene;
+          scene.add(modelRoot);
+          modelRoot.updateMatrixWorld(true);
 
-        if (blinkMesh) {
-          const m = blinkMesh.material as THREE.MeshStandardMaterial;
-          blinkBaseIntensity = m.emissiveIntensity || 2.8;
-          const pt = blinkMesh.userData.fixtureLight as
-            | THREE.PointLight
-            | undefined;
-          blinkLightBase = pt?.intensity ?? 2.2;
-        }
+          let meshCount = 0;
+          modelRoot.traverse((o) => {
+            if ((o as THREE.Mesh).isMesh) {
+              meshCount += 1;
+            }
+          });
+          console.info(
+            `[vending] loaded url=${MODEL_URL} meshes=${meshCount} icons=${iconTextures.length}`,
+          );
 
-        placePlanes(modelRoot);
-        fitCamera(modelRoot);
-        fitted = true;
-        resize();
-      },
-      undefined,
-      (err) => {
-        console.error("GLB load failed", err);
-      },
-    );
+          const box = new THREE.Box3().setFromObject(modelRoot);
+          const center = box.getCenter(new THREE.Vector3());
+          modelRoot.position.sub(center);
+          modelRoot.updateMatrixWorld(true);
+
+          // front = glass min-Z side (keypad on −X / camera-right after yaw)
+          const glass = modelRoot.getObjectByName(GLASS_MESH);
+          const glassBox = glass
+            ? new THREE.Box3().setFromObject(glass)
+            : new THREE.Box3().setFromObject(modelRoot);
+
+          const glassDepth = glassBox.max.z - glassBox.min.z;
+          const glassWidth = glassBox.max.x - glassBox.min.x;
+          const glassHeight = glassBox.max.y - glassBox.min.y;
+          console.info(
+            `[vending] glass size w=${glassWidth.toFixed(2)} h=${glassHeight.toFixed(2)} d=${glassDepth.toFixed(2)} minZ=${glassBox.min.z.toFixed(2)}`,
+          );
+
+          ownedMats.push(...openFrontGlass(modelRoot));
+
+          placeCards(modelRoot);
+          fitCamera(modelRoot);
+          fitted = true;
+          buildGui();
+          resize();
+        },
+        undefined,
+        (err) => {
+          console.error("GLB load failed", err);
+        },
+      );
+    })();
 
     resize();
     frameId = requestAnimationFrame(animate);
@@ -799,15 +1194,33 @@ export function VendingMachineScene() {
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerdown", onPointerDown);
 
-      planeGeo.dispose();
+      if (gui) {
+        gui.destroy();
+        gui = null;
+      }
+
+      delete (window as unknown as { __vending?: object }).__vending;
+
+      cardGeo.dispose();
 
       for (const mat of ownedMats) {
         mat.dispose();
       }
 
+      for (const tex of ownedTextures) {
+        const c = tex.userData.canvas as HTMLCanvasElement | undefined;
+        tex.dispose();
+
+        if (c) {
+          c.width = 0;
+          c.height = 0;
+        }
+      }
+
       if (modelRoot) {
-        for (const mesh of clickables) {
-          modelRoot.remove(mesh);
+        for (const pair of pairs) {
+          modelRoot.remove(pair.front);
+          modelRoot.remove(pair.back);
         }
 
         disposeOwned(modelRoot);
