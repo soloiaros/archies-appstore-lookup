@@ -8,7 +8,8 @@ import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 const SITE_BG = 0x0b0b0c;
 
-const SHELF_PARENT_NAMES = [
+/** Product shelves, bottom → top (pre-center names). */
+const SHELF_NAMES = [
   "polySurface263",
   "polySurface256",
   "polySurface266",
@@ -16,31 +17,30 @@ const SHELF_PARENT_NAMES = [
   "polySurface264",
 ] as const;
 
-const FLAP_NAMES = [
-  "polySurface310",
-  "polySurface311",
-  "polySurface312",
-] as const;
+/** Thin front window pane (min-Z face). */
+const GLASS_MESH = "pCube413_lambert1_0";
 
-/** Shell meshes that include the front window pane. */
-const GLASS_MESH_NAMES = [
-  "polySurface322_kor2lambert4_0",
-  "polySurface322_kor2lambert2_0",
-] as const;
+/** Front base lip — customer mouth sits just above this. */
+const FRONT_LIP = "polySurface362";
 
-/** Product-bay X from coil upright span (world, after center). */
-const BAY_X_MIN = -1.62;
-const BAY_X_MAX = 1.78;
+/**
+ * Front face is min-Z (glass pCube413). Camera looks from −Z.
+ * Keypad is on +X (screen-right) in that view.
+ */
 
-const PLANE_SIZE = 0.48;
+/** Tightest inter-shelf gap is ~0.40 — size planes to clear it. */
+const PLANE_SIZE = 0.30;
 
-const SLIDE_DISTANCE = 0.22;
+const SLIDE_DISTANCE = 0.26;
 
 const SLIDE_MS = 280;
 
 const FALL_MS = 560;
 
 const PLANE_COLOR = 0xe8e8ea;
+
+/** Sticky header + nav pills; shift frustum so cabinet clears them. */
+const HEADER_NUDGE_FRAC = 0.18;
 
 type AnimPhase = "idle" | "slide" | "fall" | "done";
 
@@ -53,14 +53,6 @@ type PlaneAnim = {
   fallEnd: THREE.Vector3;
 };
 
-type WindowBounds = {
-  minX: number;
-  maxX: number;
-  minY: number;
-  maxY: number;
-  minZ: number;
-};
-
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3;
 }
@@ -69,12 +61,16 @@ function easeInQuad(t: number): number {
   return t * t;
 }
 
-function disposeObject(root: THREE.Object3D) {
+function disposeOwned(root: THREE.Object3D) {
   root.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
 
     if (!mesh.isMesh) {
       return;
+    }
+
+    if (mesh.userData.ownsGeometry) {
+      mesh.geometry.dispose();
     }
 
     const mat = mesh.material;
@@ -91,165 +87,45 @@ function disposeObject(root: THREE.Object3D) {
   });
 }
 
-function softenCoilUprights(root: THREE.Object3D) {
+function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   const cloned: THREE.Material[] = [];
+  const mesh = root.getObjectByName(GLASS_MESH) as THREE.Mesh | undefined;
 
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-
-    if (!mesh.isMesh) {
-      return;
-    }
-
-    const match = /^polySurface(2[6-8]\d)_/.exec(mesh.name);
-
-    if (!match) {
-      return;
-    }
-
-    const id = Number(match[1]);
-
-    if (id < 267 || id > 286) {
-      return;
-    }
-
-    const mats = Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material];
-
-    const next = mats.map((m) => {
-      if (!m) {
-        return m;
-      }
-
-      const soft = m.clone();
-      soft.userData.ownsClone = true;
-      soft.transparent = true;
-      soft.opacity = 0.28;
-      soft.depthWrite = false;
-      cloned.push(soft);
-      return soft;
-    });
-
-    mesh.material = next.length === 1 ? next[0] : next;
-    mesh.renderOrder = 3;
-  });
-
-  return cloned;
-}
-
-function punchWindowHole(source: THREE.Material, win: WindowBounds): THREE.Material {
-  const mat = source.clone();
-  mat.userData.ownsClone = true;
-  mat.transparent = false;
-  mat.depthWrite = true;
-  mat.side = THREE.FrontSide;
-
-  const winUniform = {
-    uWinMin: { value: new THREE.Vector3(win.minX, win.minY, win.minZ) },
-    uWinMax: { value: new THREE.Vector3(win.maxX, win.maxY, win.minZ + 4) },
-  };
-
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uWinMin = winUniform.uWinMin;
-    shader.uniforms.uWinMax = winUniform.uWinMax;
-
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-         varying vec3 vWinWorldPos;`,
-      )
-      .replace(
-        "#include <project_vertex>",
-        `#include <project_vertex>
-         vWinWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;`,
-      );
-
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-         varying vec3 vWinWorldPos;
-         uniform vec3 uWinMin;
-         uniform vec3 uWinMax;`,
-      )
-      .replace(
-        "#include <clipping_planes_fragment>",
-        `#include <clipping_planes_fragment>
-         if (
-           vWinWorldPos.x > uWinMin.x && vWinWorldPos.x < uWinMax.x &&
-           vWinWorldPos.y > uWinMin.y && vWinWorldPos.y < uWinMax.y &&
-           vWinWorldPos.z > uWinMin.z
-         ) discard;`,
-      );
-  };
-
-  mat.needsUpdate = true;
-  return mat;
-}
-
-function applyFrontGlass(root: THREE.Object3D, win: WindowBounds) {
-  const cloned: THREE.Material[] = [];
-
-  for (const name of GLASS_MESH_NAMES) {
-    const obj = root.getObjectByName(name);
-
-    if (!obj) {
-      continue;
-    }
-
-    obj.traverse((child) => {
-      const mesh = child as THREE.Mesh;
-
-      if (!mesh.isMesh) {
-        return;
-      }
-
-      const mats = Array.isArray(mesh.material)
-        ? mesh.material
-        : [mesh.material];
-
-      const next = mats.map((m) => {
-        if (!m) {
-          return m;
-        }
-
-        const punched = punchWindowHole(m, win);
-        cloned.push(punched);
-        return punched;
-      });
-
-      mesh.material = next.length === 1 ? next[0] : next;
-      mesh.renderOrder = 0;
-    });
+  if (!mesh?.isMesh) {
+    return cloned;
   }
 
-  const glassW = win.maxX - win.minX;
-  const glassH = win.maxY - win.minY;
-  const glassGeo = new THREE.PlaneGeometry(glassW, glassH);
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xc5ccd6,
-    transparent: true,
-    opacity: 0.18,
-    roughness: 0.12,
-    metalness: 0.02,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  });
-  glassMat.userData.ownsClone = true;
-  cloned.push(glassMat);
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
 
-  const glassMesh = new THREE.Mesh(glassGeo, glassMat);
-  glassMesh.position.set(
-    (win.minX + win.maxX) * 0.5,
-    (win.minY + win.maxY) * 0.5,
-    win.minZ + 0.62,
-  );
-  glassMesh.renderOrder = 4;
-  glassMesh.userData.frontGlass = true;
-  glassMesh.userData.ownsGeometry = true;
-  root.add(glassMesh);
+  const next = mats.map((m) => {
+    if (!m) {
+      return m;
+    }
+
+    const glass = m.clone();
+    glass.userData.ownsClone = true;
+    glass.transparent = true;
+    glass.opacity = 0.18;
+    glass.depthWrite = false;
+    glass.side = THREE.DoubleSide;
+
+    const std = glass as THREE.MeshStandardMaterial;
+
+    if (std.color) {
+      std.color.setHex(0xc8d0da);
+    }
+
+    if ("roughness" in std) {
+      std.roughness = 0.12;
+      std.metalness = 0.02;
+    }
+
+    cloned.push(glass);
+    return glass;
+  });
+
+  mesh.material = next.length === 1 ? next[0] : next;
+  mesh.renderOrder = 3;
 
   return cloned;
 }
@@ -285,60 +161,60 @@ export function VendingMachineScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.18;
+    renderer.toneMappingExposure = 1.12;
     renderer.setClearColor(SITE_BG, 1);
-    mount.appendChild(renderer.domElement);
+    host.appendChild(renderer.domElement);
 
     const canvas = renderer.domElement;
     canvas.style.display = "block";
     canvas.style.width = "100%";
     canvas.style.height = "100%";
 
-    const ambient = new THREE.AmbientLight(0xd8dce4, 0.92);
+    const ambient = new THREE.AmbientLight(0xd8dce4, 0.78);
     scene.add(ambient);
 
-    const hemi = new THREE.HemisphereLight(0xe0e4ec, 0x4a4a52, 0.72);
+    const hemi = new THREE.HemisphereLight(0xe4e8f0, 0x3a3a42, 0.55);
     hemi.position.set(0, 20, 0);
     scene.add(hemi);
 
-    const key = new THREE.DirectionalLight(0xf6f8fc, 1.28);
-    key.position.set(2.5, 12, 18);
+    // soft front key (from −Z)
+    const key = new THREE.DirectionalLight(0xf4f6fa, 1.05);
+    key.position.set(2, 10, -16);
     scene.add(key);
 
-    const fill = new THREE.DirectionalLight(0xb8c0cc, 0.62);
-    fill.position.set(-10, 6, 12);
+    const fill = new THREE.DirectionalLight(0xb0b8c4, 0.55);
+    fill.position.set(-8, 4, -10);
     scene.add(fill);
 
-    const panel = new THREE.DirectionalLight(0xf4f7fc, 1.25);
-    panel.position.set(-12, 5, 14);
+    // keypad / right fascia
+    const panel = new THREE.DirectionalLight(0xf0f4fa, 0.85);
+    panel.position.set(12, 6, -8);
     scene.add(panel);
 
-    const rim = new THREE.DirectionalLight(0x9aa0aa, 0.35);
-    rim.position.set(-2, 8, -12);
+    const rim = new THREE.DirectionalLight(0x8a909a, 0.32);
+    rim.position.set(0, 6, 12);
     scene.add(rim);
 
-    const interior = new THREE.PointLight(0xf2f6ff, 1.8, 22, 2);
-    interior.position.set(0.2, 3.2, 2.8);
-    scene.add(interior);
-
-    const bayFill = new THREE.PointLight(0xe8eef8, 1.1, 16, 2);
-    bayFill.position.set(0.2, -0.4, 2.4);
-    scene.add(bayFill);
+    const bay = new THREE.PointLight(0xf0f4ff, 1.15, 18, 2);
+    bay.position.set(0, 4, -1.5);
+    scene.add(bay);
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const clickables: THREE.Mesh[] = [];
     const animations: PlaneAnim[] = [];
     const planeGeo = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
-    const sharedMats: THREE.Material[] = [];
-    let glassMats: THREE.Material[] = [];
+    const ownedMats: THREE.Material[] = [];
 
     let modelRoot: THREE.Object3D | null = null;
     let fitted = false;
-    let outAxis = new THREE.Vector3(0, 0, 1);
-    let binBase = new THREE.Vector3();
+
+    // out of compartment toward the front camera (−Z)
+    const outAxis = new THREE.Vector3(0, 0, -1);
+    const binBase = new THREE.Vector3();
 
     function centerModel(root: THREE.Object3D) {
+      root.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(root);
       const center = box.getCenter(new THREE.Vector3());
       root.position.sub(center);
@@ -350,7 +226,8 @@ export function VendingMachineScene() {
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      const margin = 1.36;
+      // generous but large — reference-like framing
+      const margin = 1.28;
       const viewH = size.y * margin;
       const viewW = size.x * margin;
       const aspect = mount.clientWidth / Math.max(mount.clientHeight, 1);
@@ -364,13 +241,19 @@ export function VendingMachineScene() {
         halfH = halfW / aspect;
       }
 
+      // shift frustum up in world → machine sits lower under sticky header
+      const nudge = halfH * HEADER_NUDGE_FRAC;
+
       camera.left = -halfW;
       camera.right = halfW;
-      camera.top = halfH;
-      camera.bottom = -halfH;
+      camera.top = halfH + nudge;
+      camera.bottom = -halfH + nudge;
       camera.near = 0.1;
       camera.far = 80;
-      camera.position.set(center.x, center.y, box.max.z + 18);
+
+      // FRONT: look from min-Z
+      const frontZ = box.min.z - 18;
+      camera.position.set(center.x, center.y, frontZ);
       camera.lookAt(center.x, center.y, center.z);
       camera.updateProjectionMatrix();
     }
@@ -390,102 +273,73 @@ export function VendingMachineScene() {
       }
     }
 
-    function measureWindow(root: THREE.Object3D): WindowBounds {
-      const shelfBox = new THREE.Box3();
-
-      for (const name of SHELF_PARENT_NAMES) {
-        const node = root.getObjectByName(name);
-
-        if (node) {
-          shelfBox.expandByObject(node);
-        }
-      }
-
-      return {
-        minX: BAY_X_MIN,
-        maxX: BAY_X_MAX,
-        minY: shelfBox.min.y - 0.2,
-        maxY: shelfBox.max.y + 0.35,
-        // front shell faces forward of shelf decks
-        minZ: shelfBox.max.z + 0.05,
-      };
-    }
-
     function placePlanes(root: THREE.Object3D) {
+      const glass = root.getObjectByName(GLASS_MESH);
+      const glassBox = glass
+        ? new THREE.Box3().setFromObject(glass)
+        : new THREE.Box3();
+
       const shelves: THREE.Box3[] = [];
 
-      for (const name of SHELF_PARENT_NAMES) {
-        const node = root.getObjectByName(name);
-
-        if (!node) {
-          continue;
-        }
-
-        shelves.push(new THREE.Box3().setFromObject(node));
-      }
-
-      const flapBox = new THREE.Box3();
-
-      for (const name of FLAP_NAMES) {
+      for (const name of SHELF_NAMES) {
         const node = root.getObjectByName(name);
 
         if (node) {
-          flapBox.expandByObject(node);
+          shelves.push(new THREE.Box3().setFromObject(node));
         }
       }
 
-      if (!flapBox.isEmpty() && shelves.length > 0) {
-        const shelfMidZ = (shelves[0].min.z + shelves[0].max.z) * 0.5;
-        const flapZ = flapBox.getCenter(new THREE.Vector3()).z;
-        outAxis =
-          flapZ >= shelfMidZ
-            ? new THREE.Vector3(0, 0, 1)
-            : new THREE.Vector3(0, 0, -1);
-      } else {
-        outAxis = new THREE.Vector3(0, 0, 1);
-      }
+      const lip = root.getObjectByName(FRONT_LIP);
+      const lipBox = lip ? new THREE.Box3().setFromObject(lip) : null;
 
-      const toLocal = (world: THREE.Vector3) => {
-        return root.worldToLocal(world.clone());
-      };
+      const toLocal = (world: THREE.Vector3) => root.worldToLocal(world.clone());
 
-      if (!flapBox.isEmpty()) {
+      // retrieval mouth: below glass, front fascia — not rear flaps (310–312)
+      if (!glassBox.isEmpty()) {
+        const gx = glassBox.getCenter(new THREE.Vector3()).x;
         binBase.copy(
           toLocal(
             new THREE.Vector3(
-              flapBox.getCenter(new THREE.Vector3()).x,
-              flapBox.min.y + 0.42,
-              flapBox.min.z - outAxis.z * 0.1,
+              gx,
+              glassBox.min.y - 0.95,
+              glassBox.min.z + 0.28,
+            ),
+          ),
+        );
+      } else if (lipBox && !lipBox.isEmpty()) {
+        binBase.copy(
+          toLocal(
+            new THREE.Vector3(
+              lipBox.getCenter(new THREE.Vector3()).x,
+              lipBox.max.y + 0.55,
+              lipBox.max.z + 0.12,
             ),
           ),
         );
       } else {
-        const mb = new THREE.Box3().setFromObject(root);
-        binBase.copy(
-          toLocal(
-            new THREE.Vector3(
-              0,
-              mb.min.y + 0.5,
-              (outAxis.z >= 0 ? mb.max.z : mb.min.z) - outAxis.z * 0.6,
-            ),
-          ),
-        );
+        binBase.set(0, -3.5, -1.2);
       }
 
-      const bayW = BAY_X_MAX - BAY_X_MIN;
+      const bayMin = !glassBox.isEmpty()
+        ? glassBox.min.x + 0.2
+        : shelves[0].min.x + 0.25;
+      const bayMax = !glassBox.isEmpty()
+        ? glassBox.max.x - 0.2
+        : shelves[0].max.x - 0.25;
+      const bayW = bayMax - bayMin;
       const slot = bayW / 3;
       const worldXs = [
-        BAY_X_MIN + slot * 0.5,
-        BAY_X_MIN + slot * 1.5,
-        BAY_X_MIN + slot * 2.5,
+        bayMin + slot * 0.5,
+        bayMin + slot * 1.5,
+        bayMin + slot * 2.5,
       ];
 
       for (let s = 0; s < shelves.length; s += 1) {
         const shelf = shelves[s];
 
-        // top face of shelf tray (AABB max.y)
-        const seatZ = shelf.max.z + 0.14;
-        const seatY = shelf.max.y + 0.05;
+        // on deck, toward glass (min Z), still inside compartment
+        const seatZ = shelf.min.z + 0.22;
+        const seatY = shelf.max.y + 0.04;
 
         for (let i = 0; i < 3; i += 1) {
           const mat = new THREE.MeshBasicMaterial({
@@ -495,9 +349,13 @@ export function VendingMachineScene() {
             depthWrite: true,
           });
 
-          sharedMats.push(mat);
+          ownedMats.push(mat);
 
           const mesh = new THREE.Mesh(planeGeo, mat);
+
+          // face the front camera (−Z)
+          mesh.rotation.y = Math.PI;
+
           const local = toLocal(
             new THREE.Vector3(
               worldXs[i],
@@ -505,6 +363,7 @@ export function VendingMachineScene() {
               seatZ,
             ),
           );
+
           mesh.position.copy(local);
           mesh.renderOrder = 1;
           mesh.userData.shelfIndex = s;
@@ -539,31 +398,28 @@ export function VendingMachineScene() {
     }
 
     function onPointerMove(event: PointerEvent) {
-      const hit = pickPlane(event);
-      canvas.style.cursor = hit ? "pointer" : "default";
+      canvas.style.cursor = pickPlane(event) ? "pointer" : "default";
     }
 
     function startVend(mesh: THREE.Mesh) {
       const existing = animations.find((a) => a.mesh === mesh);
 
-      if (existing && existing.phase !== "idle") {
-        return false;
+      if (existing && existing.phase !== "idle" && existing.phase !== "done") {
+        return;
       }
 
       if (mesh.userData.busy) {
-        return false;
+        return;
       }
 
       mesh.userData.busy = true;
       mesh.userData.clickable = false;
 
       const start = mesh.position.clone();
-      const slideEnd = start
-        .clone()
-        .addScaledVector(outAxis, SLIDE_DISTANCE);
+      const slideEnd = start.clone().addScaledVector(outAxis, SLIDE_DISTANCE);
 
-      const offsetX = ((binLanded % 3) - 1) * 0.22;
-      const offsetZ = Math.floor(binLanded / 3) * -0.12 * outAxis.z;
+      const offsetX = ((binLanded % 3) - 1) * 0.18;
+      const offsetZ = Math.floor(binLanded / 3) * 0.1 * outAxis.z;
       binLanded += 1;
 
       const fallEnd = new THREE.Vector3(
@@ -580,18 +436,14 @@ export function VendingMachineScene() {
         slideEnd,
         fallEnd,
       });
-
-      return true;
     }
 
     function onPointerDown(event: PointerEvent) {
       const mesh = pickPlane(event);
 
-      if (!mesh) {
-        return;
+      if (mesh) {
+        startVend(mesh);
       }
-
-      startVend(mesh);
     }
 
     function updateAnims(now: number) {
@@ -618,7 +470,7 @@ export function VendingMachineScene() {
           const u = Math.min(1, (now - anim.t0) / FALL_MS);
           const e = easeInQuad(u);
           anim.mesh.position.lerpVectors(anim.start, anim.fallEnd, e);
-          anim.mesh.rotation.x = e * 0.18;
+          anim.mesh.rotation.x = e * 0.2;
 
           if (u >= 1) {
             anim.mesh.position.copy(anim.fallEnd);
@@ -644,7 +496,7 @@ export function VendingMachineScene() {
       "/vending_machine.glb",
       (gltf) => {
         if (disposed) {
-          disposeObject(gltf.scene);
+          disposeOwned(gltf.scene);
           return;
         }
 
@@ -653,12 +505,7 @@ export function VendingMachineScene() {
         scene.add(modelRoot);
         centerModel(modelRoot);
 
-        const win = measureWindow(modelRoot);
-        glassMats = [
-          ...applyFrontGlass(modelRoot, win),
-          ...softenCoilUprights(modelRoot),
-        ];
-
+        ownedMats.push(...openFrontGlass(modelRoot));
         placePlanes(modelRoot);
         fitCamera(modelRoot);
         fitted = true;
@@ -674,7 +521,7 @@ export function VendingMachineScene() {
     animate();
 
     const ro = new ResizeObserver(() => resize());
-    ro.observe(mount);
+    ro.observe(host);
 
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -688,11 +535,7 @@ export function VendingMachineScene() {
 
       planeGeo.dispose();
 
-      for (const mat of sharedMats) {
-        mat.dispose();
-      }
-
-      for (const mat of glassMats) {
+      for (const mat of ownedMats) {
         mat.dispose();
       }
 
@@ -701,14 +544,7 @@ export function VendingMachineScene() {
           modelRoot.remove(mesh);
         }
 
-        modelRoot.traverse((obj) => {
-          const mesh = obj as THREE.Mesh;
-          if (mesh.isMesh && mesh.userData.ownsGeometry) {
-            mesh.geometry.dispose();
-          }
-        });
-
-        disposeObject(modelRoot);
+        disposeOwned(modelRoot);
         scene.remove(modelRoot);
       }
 
@@ -718,12 +554,11 @@ export function VendingMachineScene() {
       fill.dispose();
       panel.dispose();
       rim.dispose();
-      interior.dispose();
-      bayFill.dispose();
+      bay.dispose();
       renderer.dispose();
 
-      if (canvas.parentNode === mount) {
-        mount.removeChild(canvas);
+      if (canvas.parentNode === host) {
+        host.removeChild(canvas);
       }
     };
   }, []);
