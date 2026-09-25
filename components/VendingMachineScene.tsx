@@ -161,7 +161,7 @@ export function VendingMachineScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = 0.96;
     renderer.setClearColor(SITE_BG, 1);
     host.appendChild(renderer.domElement);
 
@@ -195,8 +195,8 @@ export function VendingMachineScene() {
     rim.position.set(0, 6, 12);
     scene.add(rim);
 
-    const bay = new THREE.PointLight(0xf0f4ff, 1.15, 18, 2);
-    bay.position.set(0, 4, -1.5);
+    const bay = new THREE.PointLight(0xf0f4ff, 0.28, 18, 2);
+    bay.position.set(0.2, 2.2, -0.2);
     scene.add(bay);
 
     const raycaster = new THREE.Raycaster();
@@ -294,15 +294,16 @@ export function VendingMachineScene() {
 
       const toLocal = (world: THREE.Vector3) => root.worldToLocal(world.clone());
 
-      // retrieval mouth: below glass, front fascia — not rear flaps (310–312)
+      // retrieval mouth, in front of the fascia so the card stays visible
       if (!glassBox.isEmpty()) {
         const gx = glassBox.getCenter(new THREE.Vector3()).x;
+        const frontZ = new THREE.Box3().setFromObject(root).min.z;
         binBase.copy(
           toLocal(
             new THREE.Vector3(
               gx,
               glassBox.min.y - 0.95,
-              glassBox.min.z + 0.28,
+              frontZ - 0.04,
             ),
           ),
         );
@@ -414,6 +415,7 @@ export function VendingMachineScene() {
 
       mesh.userData.busy = true;
       mesh.userData.clickable = false;
+      mesh.renderOrder = 5;
 
       const start = mesh.position.clone();
       const slideEnd = start.clone().addScaledVector(outAxis, SLIDE_DISTANCE);
