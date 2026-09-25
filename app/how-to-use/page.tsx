@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { SectionPage } from "@/components/DirectionalPage";
 
-import { MetalKey } from "@/components/MetalKey";
+import { Key } from "@/components/ui/Key";
 
 export const metadata: Metadata = {
   title: "How to use",
@@ -60,12 +60,9 @@ export default function HowToUsePage() {
         </section>
 
         <div className="home-actions">
-          <MetalKey
-            href="/search"
-            primary
-          >
+          <Key href="/search">
             Search
-          </MetalKey>
+          </Key>
         </div>
       </main>
     </SectionPage>

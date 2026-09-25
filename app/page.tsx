@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { SectionPage } from "@/components/DirectionalPage";
 
-import { MetalKey } from "@/components/MetalKey";
+import { Key } from "@/components/ui/Key";
 
 export default function HomePage() {
   return (
@@ -17,16 +17,13 @@ export default function HomePage() {
         </p>
 
         <div className="home-actions">
-          <MetalKey
-            href="/search"
-            primary
-          >
+          <Key href="/search">
             Search
-          </MetalKey>
+          </Key>
 
-          <MetalKey href="/how-to-use">
+          <Key href="/how-to-use">
             How to use
-          </MetalKey>
+          </Key>
         </div>
 
         <section>
