@@ -2,12 +2,9 @@ import Link from "next/link";
 
 import type { ReactNode } from "react";
 
-import { Indicator } from "@/components/ui/Indicator";
-
 export function Key({
   href,
   current = false,
-  led = false,
   children,
   className,
 }: {
@@ -15,17 +12,11 @@ export function Key({
 
   current?: boolean;
 
-  led?: boolean;
-
   children: ReactNode;
 
   className?: string;
 }) {
-  const classes = [
-    "ui-key",
-    led ? "ui-key-led" : null,
-    className,
-  ]
+  const classes = ["ui-key", className]
     .filter(Boolean)
     .join(" ");
 
@@ -36,8 +27,6 @@ export function Key({
       aria-current={current ? "page" : undefined}
       transitionTypes={["section"]}
     >
-      {led ? <Indicator on={current} /> : null}
-
       <span className="ui-key-label">{children}</span>
     </Link>
   );
