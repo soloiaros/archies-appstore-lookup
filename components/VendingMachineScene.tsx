@@ -74,6 +74,10 @@ function disposeOwned(root: THREE.Object3D) {
   root.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
 
+    if (obj instanceof THREE.Light) {
+      obj.dispose?.();
+    }
+
     if (!mesh.isMesh) {
       return;
     }
@@ -96,36 +100,6 @@ function disposeOwned(root: THREE.Object3D) {
   });
 }
 
-function darkenCabinet(root: THREE.Object3D): THREE.Material[] {
-  const owned: THREE.Material[] = [];
-
-  root.traverse((obj) => {
-    const mesh = obj as THREE.Mesh;
-
-    if (!mesh.isMesh) {
-      return;
-    }
-
-    if (mesh.userData.isNeon || mesh.name === GLASS_MESH) {
-      return;
-    }
-
-    if (mesh.userData.clickable) {
-      return;
-    }
-
-    const dark = new THREE.MeshBasicMaterial({
-      color: 0x1c1c20,
-      toneMapped: true,
-    });
-    dark.userData.ownsClone = true;
-    owned.push(dark);
-    mesh.material = dark;
-  });
-
-  return owned;
-}
-
 function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   const cloned: THREE.Material[] = [];
   const mesh = root.getObjectByName(GLASS_MESH) as THREE.Mesh | undefined;
@@ -144,20 +118,19 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
     const glass = m.clone();
     glass.userData.ownsClone = true;
     glass.transparent = true;
-    glass.opacity = 0.12;
+    glass.opacity = 0.18;
     glass.depthWrite = false;
     glass.side = THREE.DoubleSide;
 
     const std = glass as THREE.MeshStandardMaterial;
 
     if (std.color) {
-      std.color.setHex(0x101418);
+      std.color.setHex(0xb8c0ca);
     }
 
     if ("roughness" in std) {
-      std.roughness = 0.08;
-      std.metalness = 0.05;
-      std.emissive?.setHex(0x000000);
+      std.roughness = 0.12;
+      std.metalness = 0.04;
     }
 
     cloned.push(glass);
@@ -195,6 +168,20 @@ function makeNeonMaterial(
   return mat;
 }
 
+/** Fixture-owned point light — same color/position as its neon mesh. */
+function attachFixtureLight(
+  mesh: THREE.Mesh,
+  color: number,
+  intensity: number,
+): THREE.PointLight {
+  const light = new THREE.PointLight(color, intensity, 5.5, 2);
+  light.name = `${mesh.name}_pt`;
+  light.castShadow = false;
+  mesh.add(light);
+  mesh.userData.fixtureLight = light;
+  return light;
+}
+
 /**
  * Optimized lights GLB is empty — install neon fixtures along the
  * glass bay to match the reference interior LED frame + blinker.
@@ -218,7 +205,7 @@ function installNeonFixtures(
   const gz = glassBox.min.z + 0.04;
   const spanX = gx1 - gx0;
   const spanY = gy1 - gy0;
-  const tube = 0.045;
+  const tube = 0.04;
 
   const specs: {
     name: string;
@@ -269,20 +256,21 @@ function installNeonFixtures(
 
   for (const s of specs) {
     const geo = new THREE.BoxGeometry(s.w, s.h, s.d);
-    const mat = makeNeonMaterial(0xffffff, 3.2);
+    const mat = makeNeonMaterial(0xffffff, 1.8);
     owned.push(mat);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = s.name;
     mesh.position.copy(toLocal(s.x, s.y, s.z));
     mesh.userData.ownsGeometry = true;
     mesh.userData.isNeon = true;
+    attachFixtureLight(mesh, 0xfff5e6, 3.6);
     group.add(mesh);
     whites.push(mesh);
   }
 
-  const blinkMat = makeNeonMaterial(0x39ff14, 4.5);
+  const blinkMat = makeNeonMaterial(0x39ff14, 2.8);
   owned.push(blinkMat);
-  const blinkGeo = new THREE.SphereGeometry(0.055, 12, 12);
+  const blinkGeo = new THREE.SphereGeometry(0.05, 12, 12);
   const blink = new THREE.Mesh(blinkGeo, blinkMat);
   blink.name = "light_blink";
 
@@ -298,6 +286,7 @@ function installNeonFixtures(
   blink.userData.ownsGeometry = true;
   blink.userData.isNeon = true;
   blink.userData.isBlink = true;
+  attachFixtureLight(blink, 0x39ff14, 2.2);
   group.add(blink);
 
   root.add(group);
@@ -344,18 +333,20 @@ function collectOrInstallLights(
   const owned: THREE.Material[] = [];
 
   for (const mesh of whites) {
-    const mat = makeNeonMaterial(0xffffff, 3.2);
+    const mat = makeNeonMaterial(0xffffff, 1.8);
     owned.push(mat);
     mesh.material = mat;
     mesh.userData.isNeon = true;
+    attachFixtureLight(mesh, 0xfff5e6, 3.6);
   }
 
   if (blink) {
-    const mat = makeNeonMaterial(0x39ff14, 4.5);
+    const mat = makeNeonMaterial(0x39ff14, 2.8);
     owned.push(mat);
     blink.material = mat;
     blink.userData.isNeon = true;
     blink.userData.isBlink = true;
+    attachFixtureLight(blink, 0x39ff14, 2.2);
   }
 
   return { whites, blink, owned, source: "model" };
@@ -394,8 +385,7 @@ export function VendingMachineScene() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // slight lift so silhouette reads; no scene lights
-    renderer.toneMappingExposure = 0.85;
+    renderer.toneMappingExposure = 0.9;
     renderer.setClearColor(SITE_BG, 1);
     mount.appendChild(renderer.domElement);
 
@@ -404,7 +394,7 @@ export function VendingMachineScene() {
     canvas.style.width = "100%";
     canvas.style.height = "100%";
 
-    // NO Ambient/Hemisphere/Directional/Point — neon meshes only
+    // illumination only from fixture-owned PointLights (no Ambient/Hemi/Dir)
 
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
@@ -412,27 +402,27 @@ export function VendingMachineScene() {
 
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(1, 1),
-      0.9,
       0.35,
-      0.75,
+      0.6,
+      0.85,
     );
     composer.addPass(bloomPass);
 
     const bokehPass = new BokehPass(scene, camera, {
       focus: 14,
-      aperture: 0.00012,
-      maxblur: 0.0035,
+      aperture: 0.00008,
+      maxblur: 0.002,
     });
     composer.addPass(bokehPass);
 
     const colorPass = new ShaderPass(ColorCorrectionShader);
-    colorPass.uniforms.powRGB.value = new THREE.Vector3(1.2, 1.18, 1.22);
-    colorPass.uniforms.mulRGB.value = new THREE.Vector3(0.85, 0.86, 0.9);
+    colorPass.uniforms.powRGB.value = new THREE.Vector3(1.08, 1.06, 1.1);
+    colorPass.uniforms.mulRGB.value = new THREE.Vector3(0.92, 0.93, 0.96);
     composer.addPass(colorPass);
 
     const vignettePass = new ShaderPass(VignetteShader);
-    vignettePass.uniforms.offset.value = 1.05;
-    vignettePass.uniforms.darkness.value = 1.15;
+    vignettePass.uniforms.offset.value = 0.95;
+    vignettePass.uniforms.darkness.value = 0.85;
     composer.addPass(vignettePass);
 
     const outputPass = new OutputPass();
@@ -448,7 +438,8 @@ export function VendingMachineScene() {
     let modelRoot: THREE.Object3D | null = null;
     let fitted = false;
     let blinkMesh: THREE.Mesh | null = null;
-    let blinkBaseIntensity = 6;
+    let blinkBaseIntensity = 2.8;
+    let blinkLightBase = 2.2;
 
     const outAxis = new THREE.Vector3(0, 0, -1);
     const binBase = new THREE.Vector3();
@@ -728,6 +719,12 @@ export function VendingMachineScene() {
         0.08 +
         0.92 * (0.5 + 0.5 * Math.sin(now * 0.001 * Math.PI * 2 * BLINK_HZ));
       mat.emissiveIntensity = blinkBaseIntensity * pulse;
+
+      const pt = blinkMesh.userData.fixtureLight as THREE.PointLight | undefined;
+
+      if (pt) {
+        pt.intensity = blinkLightBase * pulse;
+      }
     }
 
     function animate(now: number) {
@@ -764,12 +761,15 @@ export function VendingMachineScene() {
 
         const lights = collectOrInstallLights(modelRoot, glassBox);
         ownedMats.push(...lights.owned);
-        ownedMats.push(...darkenCabinet(modelRoot));
         blinkMesh = lights.blink;
 
         if (blinkMesh) {
           const m = blinkMesh.material as THREE.MeshStandardMaterial;
-          blinkBaseIntensity = m.emissiveIntensity || 4.5;
+          blinkBaseIntensity = m.emissiveIntensity || 2.8;
+          const pt = blinkMesh.userData.fixtureLight as
+            | THREE.PointLight
+            | undefined;
+          blinkLightBase = pt?.intensity ?? 2.2;
         }
 
         placePlanes(modelRoot);
