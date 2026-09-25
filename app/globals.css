@@ -1204,7 +1204,6 @@ ol {
 
 .home-hero {
   position: relative;
-  z-index: 2;
   box-sizing: border-box;
   display: grid;
   place-items: center;
@@ -1212,8 +1211,7 @@ ol {
   min-height: 100dvh;
   margin: 0;
   padding: 0;
-  pointer-events: none;
-  background: transparent;
+  background: var(--color-ink);
 }
 
 .home-hero-title {
@@ -1228,12 +1226,11 @@ ol {
 }
 
 .home-machine {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+  position: relative;
   box-sizing: border-box;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
   margin: 0;
   padding: 0;
   overflow: hidden;
