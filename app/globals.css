@@ -1099,48 +1099,97 @@ a.locker-link:focus-visible {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.55rem;
-  padding: 0 0.7rem;
+  padding: 0 0.55rem 0 4.7rem;
   box-sizing: border-box;
 }
 
-.locker-latch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
+.locker-handle {
+  pointer-events: none;
+  position: absolute;
+  z-index: 3;
+  left: 0.28rem;
+  top: 50%;
+  width: 1.42rem;
+  height: 1.42rem;
+  margin-top: -0.71rem;
+  transform: translateZ(7px);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
-.locker-knob {
-  display: block;
-  width: 0.72rem;
-  height: 0.72rem;
+.locker-rose {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  background: #5c5c60;
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      #5e5e5a 0 28%,
+      #a4a4a0 34%,
+      #7a7a76 46%,
+      #4e4e4c 68%,
+      #2c2c2a 100%
+    );
   box-shadow:
-    2px 2px 3px rgb(0 0 0 / 0.45),
-    -1px -1px 2px rgb(255 255 255 / 0.16),
-    inset 0 1px 1px rgb(255 255 255 / 0.18);
-  transform-origin: 50% 50%;
-  transform: perspective(140px) rotateX(0deg);
-  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
-  will-change: transform;
+    0 1px 0 rgb(255 255 255 / 0.35),
+    0 2px 4px rgb(0 0 0 / 0.5),
+    inset 0 1px 1px rgb(255 255 255 / 0.55),
+    inset 0 -2px 3px rgb(0 0 0 / 0.55);
 }
 
-.locker-door:hover .locker-knob,
-.locker-door:focus-visible .locker-knob {
-  transform: perspective(140px) rotateX(-22deg);
+.locker-lever {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.35rem;
+  height: 1.15rem;
+  margin-left: -0.62rem;
+  margin-top: -0.575rem;
+  transform-origin: 0.62rem 50%;
+  transform: rotate(0deg);
+  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.locker-slot {
-  width: 0.55rem;
-  height: 0.14rem;
-  border-radius: 999px;
-  background: var(--locker-ink);
+.locker-lever-shade,
+.locker-lever-body {
+  position: absolute;
+  inset: 0;
+  clip-path: polygon(
+    2% 24%,
+    12% 10%,
+    78% 22%,
+    100% 50%,
+    78% 78%,
+    12% 90%,
+    2% 76%
+  );
+}
+
+.locker-lever-shade {
+  background: linear-gradient(180deg, #3a3a38, #1c1c1b);
+  transform: translateY(3px);
+}
+
+.locker-lever-body {
+  background: linear-gradient(
+    180deg,
+    #f7f7f4 0%,
+    #d2d2cc 18%,
+    #9a9a94 40%,
+    #6e6e6a 68%,
+    #454542 100%
+  );
   box-shadow:
-    inset 0 1px 1px rgb(0 0 0 / 0.55),
-    0 0.5px 0 rgb(255 255 255 / 0.12);
+    inset 0 1px 0 #fff,
+    inset 0 -1px 0 rgb(0 0 0 / 0.35);
+}
+
+.locker-door:hover .locker-lever,
+.locker-door:focus-visible .locker-lever {
+  transform: rotate(54deg);
 }
 
 .locker-vents {
@@ -1196,13 +1245,13 @@ a.locker-link:focus-visible {
   .composer[data-busy="true"] button,
   .locker-door,
   .locker-bay,
-  .locker-knob {
+  .locker-lever {
     transition: none !important;
     animation: none !important;
   }
 
-  .locker-door:hover .locker-knob,
-  .locker-door:focus-visible .locker-knob {
+  .locker-door:hover .locker-lever,
+  .locker-door:focus-visible .locker-lever {
     transform: none;
   }
 
