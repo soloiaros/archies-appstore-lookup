@@ -111,7 +111,9 @@ export function SearchComposer({
       <button
         type="submit"
         disabled={
-          busy || value.trim().length < 2
+          ready
+            ? busy || value.trim().length < 2
+            : false
         }
         aria-label={
           busy

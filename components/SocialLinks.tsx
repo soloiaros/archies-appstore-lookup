@@ -70,11 +70,6 @@ function GitHubMark() {
 function DoorFace() {
   return (
     <div className="locker-face" aria-hidden>
-      <span className="locker-latch">
-        <span className="locker-knob" />
-        <span className="locker-slot" />
-      </span>
-
       <span className="locker-vents">
         <span />
         <span />
@@ -221,6 +216,14 @@ export function SocialLinks() {
 
           <span className="locker-door-back">
             <DoorFace />
+          </span>
+
+          <span className="locker-handle" aria-hidden>
+            <span className="locker-rose" />
+            <span className="locker-lever">
+              <span className="locker-lever-shade" />
+              <span className="locker-lever-body" />
+            </span>
           </span>
         </button>
       </div>
