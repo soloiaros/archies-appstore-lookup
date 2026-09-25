@@ -4,23 +4,22 @@ import Link from "next/link";
 
 import { usePathname } from "next/navigation";
 
-import { MetalKey } from "@/components/MetalKey";
+import { Key } from "@/components/ui/Key";
+
+import { Well } from "@/components/ui/Well";
 
 const NAV = [
   {
     href: "/search",
     label: "Search",
-    primary: true,
   },
   {
     href: "/how-to-use",
     label: "How to use",
-    primary: false,
   },
   {
     href: "/studio",
     label: "Studio",
-    primary: false,
   },
 ] as const;
 
@@ -68,27 +67,29 @@ export function SiteHeader() {
         <span className="brand-word">10K</span>
       </Link>
 
-      <nav
-        className="nav-well"
-        aria-label="Primary"
-      >
-        {NAV.map((item) => {
-          const current =
-            pathname === item.href
-            || pathname.startsWith(`${item.href}/`);
+      <Well className="nav-well">
+        <nav
+          className="nav-keys"
+          aria-label="Primary"
+        >
+          {NAV.map((item) => {
+            const current =
+              pathname === item.href
+              || pathname.startsWith(`${item.href}/`);
 
-          return (
-            <MetalKey
-              key={item.href}
-              href={item.href}
-              current={current}
-              primary={item.primary}
-            >
-              {item.label}
-            </MetalKey>
-          );
-        })}
-      </nav>
+            return (
+              <Key
+                key={item.href}
+                href={item.href}
+                current={current}
+                led
+              >
+                {item.label}
+              </Key>
+            );
+          })}
+        </nav>
+      </Well>
     </header>
   );
 }
