@@ -164,6 +164,7 @@ export function SocialLinks() {
     <div
       className="locker"
       data-open={open ? "true" : "false"}
+      style={{ viewTransitionName: "social-locker" }}
     >
       <div className="locker-scene">
         <div

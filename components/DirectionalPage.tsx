@@ -26,6 +26,28 @@ export function DirectionalPage({
   );
 }
 
+export function SectionPage({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  return (
+    <ViewTransition
+      enter={{
+        section: "fade-in",
+        default: "none",
+      }}
+      exit={{
+        section: "fade-out",
+        default: "none",
+      }}
+      default="none"
+    >
+      {children}
+    </ViewTransition>
+  );
+}
+
 export function SearchPage({
   children,
 }: {
