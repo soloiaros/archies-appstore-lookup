@@ -11,7 +11,7 @@ export function ProButton({
     return (
       <button
         type="button"
-        className="home-footer-link home-footer-pro"
+        className="home-footer-link"
         onClick={() => playButtonSound()}
       >
         Pro

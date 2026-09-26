@@ -30,6 +30,8 @@ export function SiteHeader() {
 
   const [scrolled, setScrolled] = useState(false);
 
+  const [pastHero, setPastHero] = useState(false);
+
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -59,7 +61,23 @@ export function SiteHeader() {
 
   useEffect(() => {
     const onScroll = () => {
-      setScrolled(window.scrollY > 2);
+      const y = window.scrollY;
+
+      setScrolled(y > 2);
+
+      if (!home) {
+        setPastHero(false);
+        return;
+      }
+
+      const hero = document.querySelector(".home-hero");
+
+      if (!hero) {
+        setPastHero(false);
+        return;
+      }
+
+      setPastHero(hero.getBoundingClientRect().bottom <= 0);
     };
 
     onScroll();
@@ -79,13 +97,14 @@ export function SiteHeader() {
         capture: true,
       });
     };
-  }, []);
+  }, [home]);
 
   return (
     <>
       <header
         ref={headerRef}
         className="site-header"
+        data-hidden={pastHero ? "true" : "false"}
         style={{ viewTransitionName: "site-header" }}
       >
         <div className="page-rail site-header-bar">
@@ -134,7 +153,8 @@ export function SiteHeader() {
 
       <div
         className="header-blur"
-        data-on={scrolled ? "true" : "false"}
+        data-on={scrolled && !pastHero ? "true" : "false"}
+        data-hidden={pastHero ? "true" : "false"}
         aria-hidden
       />
     </>

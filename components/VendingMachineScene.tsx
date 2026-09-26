@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from "react";
 
-import GUI from "lil-gui";
 import * as THREE from "three";
 
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -48,14 +47,14 @@ const CARD_DEPTH = 0.032;
 /** Matches tuned default cardSize. */
 const BASE_CARD_SIZE = 0.72;
 
-const DEFAULT_SLIDE_MS = 900;
+const DEFAULT_SLIDE_MS = 320;
 
-const DEFAULT_FALL_MS = 780;
+const DEFAULT_FALL_MS = 450;
 
 /** Fall tumble range (degrees). */
-const DEFAULT_ROT_MIN_DEG = 8;
+const DEFAULT_ROT_MIN_DEG = 20;
 
-const DEFAULT_ROT_SPAN_DEG = 14;
+const DEFAULT_ROT_SPAN_DEG = 40;
 
 /** Tuned photographic framing (do not auto-fit over these). */
 const FOCAL_LENGTH_MM = 36.5;
@@ -475,9 +474,6 @@ export function VendingMachineScene() {
 
     const mount = hostEl;
 
-    // HMR / StrictMode orphan cleanup
-    document.querySelectorAll(".lil-gui").forEach((el) => el.remove());
-
     let disposed = false;
     let frameId = 0;
 
@@ -520,7 +516,7 @@ export function VendingMachineScene() {
     scene.add(ambientLight, hemiLight);
 
     // candela, close
-    const magentaLight = new THREE.PointLight(0xff2d9a, 380, 12, 2);
+    const magentaLight = new THREE.PointLight(0xff2d9a, 15, 12, 2);
     magentaLight.position.set(-5.6, 2.6, -2.8);
     scene.add(magentaLight);
 
@@ -536,12 +532,12 @@ export function VendingMachineScene() {
     magentaFill.target.position.set(-1.2, -4.2, -2.4);
     scene.add(magentaFill, magentaFill.target);
 
-    const coolKey = new THREE.DirectionalLight(0xd0e4ff, 2.2);
+    const coolKey = new THREE.DirectionalLight(0xd0e4ff, 1.8);
     coolKey.position.set(9, 5, -2);
     coolKey.target.position.set(1.2, 0.4, -0.4);
     scene.add(coolKey, coolKey.target);
 
-    const coolPoint = new THREE.PointLight(0xc5dcff, 220, 10, 2);
+    const coolPoint = new THREE.PointLight(0xc5dcff, 259, 10, 2);
     coolPoint.position.set(5.4, 1.8, -2.6);
     scene.add(coolPoint);
 
@@ -617,8 +613,6 @@ export function VendingMachineScene() {
     let bayMaxX = 0;
     /** Local Y where every fallen card lands (retrieval mouth). */
     let fallLandLocalY = -2.2;
-    let gui: GUI | null = null;
-
     const outAxis = new THREE.Vector3(0, 0, -1);
     const lookTarget = new THREE.Vector3();
 
@@ -642,21 +636,21 @@ export function VendingMachineScene() {
     };
 
     const postTune = {
-      bloomStrength: 0.03,
-      bloomRadius: 1.5,
+      bloomStrength: 0.04,
+      bloomRadius: 0.6,
       bloomThreshold: 0,
-      exposure: 1.18,
+      exposure: 1.25,
     };
 
     const lightTune = {
       ambient: 0.22,
       hemi: 0.4,
       neon: 0.7,
-      magenta: 380,
-      magentaFill: 260,
-      cool: 2.2,
-      coolPoint: 220,
-      pool: 9,
+      magenta: 15,
+      magentaFill: 117,
+      cool: 1.8,
+      coolPoint: 259,
+      pool: 10.2,
       fog: 0.018,
       ambientColor: "#8a90a0",
       neonColor: "#c8f0ff",
@@ -1066,143 +1060,6 @@ export function VendingMachineScene() {
       }
     }
 
-    function buildGui() {
-      if (gui) {
-        gui.destroy();
-        gui = null;
-      }
-
-      document.querySelectorAll(".lil-gui").forEach((el) => el.remove());
-
-      gui = new GUI({
-        title: "Vending tune",
-        container: mount,
-      });
-      gui.domElement.style.position = "absolute";
-      gui.domElement.style.top = "8px";
-      gui.domElement.style.right = "8px";
-      gui.domElement.style.left = "auto";
-      gui.domElement.style.maxHeight = "calc(100% - 16px)";
-      gui.domElement.style.overflow = "auto";
-      gui.domElement.style.zIndex = "40";
-
-      const camFolder = gui.addFolder("Camera");
-      camFolder.add(camTune, "x", -40, 40, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "y", -20, 20, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "z", -40, 40, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "tx", -20, 20, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "ty", -10, 10, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "tz", -10, 10, 0.01).onChange(applyCameraFromTune);
-      camFolder
-        .add(camTune, "focalLength", 24, 85, 0.5)
-        .name("focal mm")
-        .onChange(applyCameraFromTune);
-      camFolder.add(camTune, "yaw", -35, 35, 0.1).onChange(() => {
-        cameraLocked = false;
-        if (modelRoot) {
-          fitCamera(modelRoot);
-        }
-      });
-      camFolder.add(camTune, "pitch", -35, 35, 0.1).onChange(() => {
-        cameraLocked = false;
-        if (modelRoot) {
-          fitCamera(modelRoot);
-        }
-      });
-
-      const postFolder = gui.addFolder("Post");
-      postFolder
-        .add(postTune, "bloomStrength", 0, 1.5, 0.01)
-        .onChange(applyPostTune);
-      postFolder
-        .add(postTune, "bloomRadius", 0, 1.5, 0.01)
-        .onChange(applyPostTune);
-      postFolder
-        .add(postTune, "bloomThreshold", 0, 1, 0.01)
-        .onChange(applyPostTune);
-      postFolder.add(postTune, "exposure", 0.2, 2, 0.01).onChange(applyPostTune);
-
-      rows.forEach((row, i) => {
-        const f = gui!.addFolder(`Row ${i + 1}`);
-        f.add(row, "spacing", 0, 1.2, 0.005).onChange(layoutCards);
-        f.add(row, "x", -1.5, 1.5, 0.005).onChange(layoutCards);
-        f.add(row, "y", -1.5, 1.5, 0.005).onChange(layoutCards);
-        f.add(row, "z", -1.5, 1.5, 0.005).onChange(layoutCards);
-        f.add(row, "cardSize", 0.2, 1.2, 0.01).onChange(layoutCards);
-        f.add(row, "depthGap", 0.04, 0.35, 0.005).onChange(layoutCards);
-      });
-
-      const lightFolder = gui.addFolder("Lights");
-      lightFolder
-        .add(lightTune, "ambient", 0, 1.5, 0.01)
-        .onChange((v: number) => {
-          ambientLight.intensity = v;
-        });
-      lightFolder.add(lightTune, "hemi", 0, 1.5, 0.01).onChange((v: number) => {
-        hemiLight.intensity = v;
-      });
-      lightFolder
-        .add(lightTune, "neon", 0, 3, 0.01)
-        .onChange(() => applyNeonIntensity());
-      lightFolder
-        .add(lightTune, "magenta", 0, 1200, 1)
-        .onChange((v: number) => {
-          magentaLight.intensity = v;
-        });
-      lightFolder
-        .add(lightTune, "magentaFill", 0, 1500, 1)
-        .name("magenta fill")
-        .onChange((v: number) => {
-          magentaFill.intensity = v;
-        });
-      lightFolder
-        .add(lightTune, "cool", 0, 12, 0.05)
-        .onChange((v: number) => {
-          coolKey.intensity = v;
-        });
-      lightFolder
-        .add(lightTune, "coolPoint", 0, 800, 1)
-        .name("cool point")
-        .onChange((v: number) => {
-          coolPoint.intensity = v;
-        });
-      lightFolder.add(lightTune, "pool", 0, 20, 0.1).onChange((v: number) => {
-        poolLight.intensity = v;
-      });
-      lightFolder.add(lightTune, "fog", 0, 0.12, 0.001).onChange(applyFogTune);
-      lightFolder.addColor(lightTune, "ambientColor").onChange((v: string) => {
-        ambientLight.color.set(v);
-      });
-      lightFolder.addColor(lightTune, "neonColor").onChange(() => {
-        applyNeonIntensity();
-      });
-      lightFolder.addColor(lightTune, "magentaColor").onChange((v: string) => {
-        magentaLight.color.set(v);
-        magentaFill.color.set(v);
-      });
-      lightFolder.addColor(lightTune, "coolColor").onChange((v: string) => {
-        coolKey.color.set(v);
-        coolPoint.color.set(v);
-      });
-
-      const vendFolder = gui.addFolder("Vend anim");
-      vendFolder
-        .add(vendTune, "slideMs", 100, 2500, 10)
-        .name("slide ms");
-      vendFolder
-        .add(vendTune, "fallMs", 100, 2500, 10)
-        .name("fall ms");
-      vendFolder
-        .add(vendTune, "rotMinDeg", 0, 40, 0.5)
-        .name("rot min °");
-      vendFolder
-        .add(vendTune, "rotSpanDeg", 0, 40, 0.5)
-        .name("rot span °");
-
-      applyPostTune();
-      applyFogTune();
-    }
-
     function resize() {
       const w = mount.clientWidth;
       const h = mount.clientHeight;
@@ -1547,7 +1404,8 @@ export function VendingMachineScene() {
           placeCards(modelRoot);
           applyCameraFromTune();
           fitted = true;
-          buildGui();
+          applyPostTune();
+          applyFogTune();
           resize();
         },
         undefined,
@@ -1572,11 +1430,6 @@ export function VendingMachineScene() {
       ro.disconnect();
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerdown", onPointerDown);
-
-      if (gui) {
-        gui.destroy();
-        gui = null;
-      }
 
       delete (window as unknown as { __vending?: object }).__vending;
 

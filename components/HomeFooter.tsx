@@ -81,7 +81,7 @@ export function HomeFooter() {
       <div className="home-footer-copy">
         <img
           className="home-footer-logo"
-          src="/branding/logo-full.svg"
+          src="/branding/logo.svg"
           alt="10K"
         />
 
