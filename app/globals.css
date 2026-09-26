@@ -582,7 +582,7 @@ ol {
   overscroll-behavior: contain;
   background: var(--color-ink);
   padding:
-    max(1rem, env(safe-area-inset-top))
+    calc(var(--header-h, 3.25rem) + 0.5rem)
     1.25rem
     max(2rem, env(safe-area-inset-bottom));
 }
@@ -967,7 +967,7 @@ ol {
   view-transition-name: site-header;
   pointer-events: none;
   position: fixed;
-  z-index: 35;
+  z-index: 50;
   top: 0;
   left: 0;
   right: 0;
@@ -981,12 +981,26 @@ ol {
   box-sizing: border-box;
   border-bottom: 1px solid rgb(255 255 255 / 0.04);
   background: var(--color-ink);
+  transform: translateY(0);
+  transition: transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.site-header[data-hidden="true"] {
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.site-header[data-hidden="true"] .page-rail,
+.site-header[data-hidden="true"] .brand,
+.site-header[data-hidden="true"] .ui-well,
+.site-header[data-hidden="true"] .ui-key {
+  pointer-events: none;
 }
 
 .header-blur {
   pointer-events: none;
   position: fixed;
-  z-index: 34;
+  z-index: 49;
   left: 0;
   right: 0;
   top: var(--header-h, 3.25rem);
@@ -1005,11 +1019,18 @@ ol {
     rgb(0 0 0 / 0.45) 42%,
     transparent 100%
   );
-  transition: opacity 220ms var(--ease-premium);
+  transition:
+    opacity 160ms cubic-bezier(0.4, 0, 0.2, 1),
+    transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .header-blur[data-on="true"] {
   opacity: 1;
+}
+
+.header-blur[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(calc(-1 * var(--header-h, 3.25rem)));
 }
 
 .page-rail,
@@ -1666,6 +1687,7 @@ ol {
   display: block;
   width: clamp(6.8rem, 14vw, 10.8rem);
   height: auto;
+  filter: brightness(0) invert(1);
 }
 
 button.home-footer-link {
@@ -1674,14 +1696,6 @@ button.home-footer-link {
   background: transparent;
   font: inherit;
   cursor: pointer;
-}
-
-.home-footer-pro {
-  color: #ff6a00;
-}
-
-.home-footer-pro:hover {
-  color: #ff8a33;
 }
 
 .home-footer-lede {
@@ -1713,15 +1727,6 @@ button.home-footer-link {
 
 .home-footer-link:hover {
   color: var(--color-text);
-}
-
-.home-footer-link.home-footer-pro,
-.home-footer-link.home-footer-pro:hover {
-  color: #ff6a00;
-}
-
-.home-footer-link.home-footer-pro:hover {
-  color: #ff8a33;
 }
 
 .home-footer-link:focus-visible {
