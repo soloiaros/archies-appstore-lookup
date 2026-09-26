@@ -6,7 +6,10 @@ import { openCatalog } from "@/lib/scrape/store";
 
 export const runtime = "nodejs";
 
+/** Small WebP — light enough for 50 unique icons. */
 const SIZE = 128;
+
+const WEBP_QUALITY = 52;
 
 type Params = {
   params: Promise<{
@@ -71,15 +74,15 @@ export async function GET(_request: Request, { params }: Params) {
 
     const input = Buffer.from(await upstream.arrayBuffer());
 
-    const png = await sharp(input)
+    const webp = await sharp(input)
       .resize(SIZE, SIZE, { fit: "cover" })
-      .png()
+      .webp({ quality: WEBP_QUALITY, effort: 4 })
       .toBuffer();
 
-    return new NextResponse(new Uint8Array(png), {
+    return new NextResponse(new Uint8Array(webp), {
       status: 200,
       headers: {
-        "Content-Type": "image/png",
+        "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=86400, immutable",
       },
     });

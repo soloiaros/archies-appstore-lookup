@@ -4,12 +4,12 @@ import { openCatalog } from "@/lib/scrape/store";
 
 export const runtime = "nodejs";
 
-const DEFAULT_LIMIT = 40;
+const DEFAULT_LIMIT = 50;
 
-const MAX_LIMIT = 48;
+const MAX_LIMIT = 50;
 
 /**
- * Popular overall-chart apps only (few dozen).
+ * Popular overall-chart apps only (50 WebP icons).
  * Client loads icons via /api/vending-icons/[trackId].
  */
 export async function GET(request: Request) {
