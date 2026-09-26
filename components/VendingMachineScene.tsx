@@ -28,6 +28,13 @@ const BLINK_MESH = "blinking_light";
 
 const CARDS_PER_ROW = 4;
 
+/** Front + three behind, equally spaced by depthGap. */
+const STACK_DEPTH = 4;
+
+const ATLAS_CELL = 128;
+
+const ATLAS_COLS = 8;
+
 /** Superellipse exponent — iOS continuous-corner feel. */
 const SQUIRCLE_N = 5;
 
@@ -60,34 +67,37 @@ type RowTune = {
   depthGap: number;
 };
 
-type CardPiece = {
-  root: THREE.Group;
-  mesh: THREE.Mesh;
-  mat: THREE.MeshPhysicalMaterial;
-};
-
-type CardPair = {
-  front: CardPiece;
-  back: CardPiece;
+/** One shelf slot: queue order[0] = front … order[last] = furthest back. */
+type CardStack = {
   row: number;
   slot: number;
-  frontHome: THREE.Vector3;
-  backHome: THREE.Vector3;
+  /** Instance ids front → back. */
+  order: number[];
+  homes: THREE.Vector3[];
   busy: boolean;
 };
 
-type PairAnim = {
-  pair: CardPair;
+type StackAnim = {
+  stack: CardStack;
   phase: AnimPhase;
   t0: number;
-  frontStart: THREE.Vector3;
-  backStart: THREE.Vector3;
-  slideEndFront: THREE.Vector3;
-  slideEndBack: THREE.Vector3;
+  /** Start positions for each card in current order. */
+  starts: THREE.Vector3[];
+  /** Slide targets (order[i] → homes[i-1] / outward for front). */
+  slideEnds: THREE.Vector3[];
   fallEnd: THREE.Vector3;
+  fallId: number;
   rotAxis: THREE.Vector3;
   rotAmount: number;
   baseQuat: THREE.Quaternion;
+};
+
+type IconAtlas = {
+  texture: THREE.CanvasTexture;
+  cols: number;
+  rows: number;
+  count: number;
+  tileScale: THREE.Vector2;
 };
 
 type NeonTube = {
@@ -179,31 +189,80 @@ function makeCardGeometry(size: number): THREE.ExtrudeGeometry {
   return geo;
 }
 
-function loadTexture(url: string, loader: THREE.TextureLoader): Promise<THREE.Texture> {
+function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
-    loader.load(
-      url,
-      (tex) => {
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 4;
-        tex.generateMipmaps = true;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        tex.wrapS = THREE.ClampToEdgeWrapping;
-        tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.userData.sourceUrl = url;
-        tex.userData.ownsTexture = true;
-        resolve(tex);
-      },
-      undefined,
-      () => reject(new Error(`icon load failed: ${url}`)),
-    );
+    const img = new Image();
+    img.decoding = "async";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`icon load failed: ${url}`));
+    img.src = url;
   });
 }
 
-async function loadIconPool(
-  limit: number,
-): Promise<{ textures: THREE.Texture[]; count: number }> {
+function atlasUvOffset(
+  index: number,
+  cols: number,
+  rows: number,
+): { u: number; v: number } {
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  // flipY atlas: row 0 drawn at canvas top → GL v high
+  return {
+    u: col / cols,
+    v: 1 - (row + 1) / rows,
+  };
+}
+
+function buildIconAtlas(images: HTMLImageElement[]): IconAtlas {
+  const count = images.length;
+  const cols = ATLAS_COLS;
+  const rows = Math.max(1, Math.ceil(count / cols));
+  const canvas = document.createElement("canvas");
+  canvas.width = cols * ATLAS_CELL;
+  canvas.height = rows * ATLAS_CELL;
+  const ctx = canvas.getContext("2d", { alpha: false })!;
+  ctx.fillStyle = "#111";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let i = 0; i < count; i += 1) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    ctx.drawImage(
+      images[i],
+      col * ATLAS_CELL,
+      row * ATLAS_CELL,
+      ATLAS_CELL,
+      ATLAS_CELL,
+    );
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.flipY = true;
+  texture.needsUpdate = true;
+  texture.userData.ownsTexture = true;
+  texture.userData.canvas = canvas;
+
+  console.info(
+    `[vending] atlas ${cols}x${rows} cells @${ATLAS_CELL}px → ${canvas.width}x${canvas.height} (${count} icons)`,
+  );
+
+  return {
+    texture,
+    cols,
+    rows,
+    count,
+    tileScale: new THREE.Vector2(1 / cols, 1 / rows),
+  };
+}
+
+async function loadIconAtlas(limit: number): Promise<IconAtlas> {
   const res = await fetch(`/api/vending-icons?limit=${limit}`);
 
   if (!res.ok) {
@@ -216,43 +275,30 @@ async function loadIconPool(
   };
 
   console.info(
-    `[vending] loading ${body.icons.length} WebP icons (api count=${body.count})`,
+    `[vending] packing ${body.icons.length} WebP icons (api count=${body.count})`,
   );
-
-  THREE.Cache.enabled = true;
-  const loader = new THREE.TextureLoader();
 
   const settled = await Promise.allSettled(
-    body.icons.map((icon) => loadTexture(icon.src, loader)),
+    body.icons.map((icon) => loadImage(icon.src)),
   );
 
-  const textures: THREE.Texture[] = [];
-  const seen = new Set<string>();
+  const images: HTMLImageElement[] = [];
 
   for (let i = 0; i < settled.length; i += 1) {
     const result = settled[i];
 
     if (result.status === "fulfilled") {
-      const url = String(result.value.userData.sourceUrl ?? "");
-
-      if (url && seen.has(url)) {
-        result.value.dispose();
-        continue;
-      }
-
-      if (url) {
-        seen.add(url);
-      }
-
-      textures.push(result.value);
+      images.push(result.value);
     } else {
       console.warn("[vending] skip icon", body.icons[i].trackId, result.reason);
     }
   }
 
-  console.info(`[vending] cached ${textures.length} unique WebP textures @128px`);
+  if (images.length === 0) {
+    throw new Error("no icons loaded for atlas");
+  }
 
-  return { textures, count: textures.length };
+  return buildIconAtlas(images);
 }
 
 function disposeOwned(root: THREE.Object3D) {
@@ -324,13 +370,13 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   return cloned;
 }
 
-/** Glossy so neon catches the icon surface. */
-function makeGlossIconMaterial(
-  map: THREE.Texture | null,
+/** One glossy material; atlas UV offset is a per-instance attribute. */
+function makeAtlasCardMaterial(
+  atlas: IconAtlas,
 ): THREE.MeshPhysicalMaterial {
   const mat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    map: map ?? null,
+    map: atlas.texture,
     roughness: 0.16,
     metalness: 0.14,
     clearcoat: 0.9,
@@ -338,6 +384,30 @@ function makeGlossIconMaterial(
     side: THREE.FrontSide,
   });
   mat.userData.ownsClone = true;
+  mat.userData.tileScale = atlas.tileScale;
+
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTileScale = { value: atlas.tileScale.clone() };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `#include <common>
+attribute vec2 atlasOffset;
+uniform vec2 uTileScale;`,
+      )
+      .replace(
+        "#include <uv_vertex>",
+        `#include <uv_vertex>
+#ifdef USE_MAP
+	vMapUv = vMapUv * uTileScale + atlasOffset;
+#endif`,
+      );
+  };
+
+  mat.customProgramCacheKey = () =>
+    `vending-atlas-v3-${atlas.cols}x${atlas.rows}`;
+  mat.needsUpdate = true;
   return mat;
 }
 
@@ -477,21 +547,40 @@ export function VendingMachineScene() {
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const pairs: CardPair[] = [];
-    const animations: PairAnim[] = [];
+    const stacks: CardStack[] = [];
+    const animations: StackAnim[] = [];
     const ownedMats: THREE.Material[] = [];
     const ownedTextures: THREE.Texture[] = [];
     const ownedGeos: THREE.BufferGeometry[] = [];
 
+    const instanceCount = ROW_COUNT * CARDS_PER_ROW * STACK_DEPTH;
     let cardGeo = makeCardGeometry(BASE_CARD_SIZE);
     ownedGeos.push(cardGeo);
+
+    const atlasOffsets = new Float32Array(instanceCount * 2);
+    const atlasAttr = new THREE.InstancedBufferAttribute(atlasOffsets, 2);
+    cardGeo.setAttribute("atlasOffset", atlasAttr);
+
+    let cardMesh: THREE.InstancedMesh | null = null;
+    let iconAtlas: IconAtlas | null = null;
+    /** atlas cell index per instance */
+    const iconIndexOf = new Int16Array(instanceCount).fill(-1);
+    /** stack owning each instance id */
+    const stackOfInstance: Array<CardStack | null> = Array(instanceCount).fill(
+      null,
+    );
+
+    const dummy = new THREE.Object3D();
+    const faceQuat = new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(0, Math.PI, 0),
+    );
+    const scratchQuat = new THREE.Quaternion();
 
     let modelRoot: THREE.Object3D | null = null;
     let ground: THREE.Mesh | null = null;
     let fitted = false;
     // tuned camera is the source of truth — never auto-fit over it
     let cameraLocked = true;
-    let iconTextures: THREE.Texture[] = [];
     let shelfSeats: Array<{ y: number; z: number }> = [];
     let bayMinX = 0;
     let bayMaxX = 0;
@@ -553,72 +642,72 @@ export function VendingMachineScene() {
       return { y, z };
     }
 
-    function pickTexture(exclude?: THREE.Texture | null): THREE.Texture | null {
-      if (iconTextures.length === 0) {
-        return null;
+    function pickIconIndex(exclude?: number): number {
+      if (!iconAtlas || iconAtlas.count === 0) {
+        return 0;
       }
 
-      if (iconTextures.length === 1) {
-        return iconTextures[0];
+      if (iconAtlas.count === 1) {
+        return 0;
       }
 
-      let tex = iconTextures[Math.floor(Math.random() * iconTextures.length)];
+      let idx = Math.floor(Math.random() * iconAtlas.count);
 
-      for (let i = 0; i < 6 && tex === exclude; i += 1) {
-        tex = iconTextures[Math.floor(Math.random() * iconTextures.length)];
+      for (let i = 0; i < 8 && idx === exclude; i += 1) {
+        idx = Math.floor(Math.random() * iconAtlas.count);
       }
 
-      return tex;
+      return idx;
     }
 
-    /** One map on the whole mesh — same icon front/back/sides. */
-    function assignMap(piece: CardPiece, tex: THREE.Texture | null) {
-      piece.mat.map = tex;
-      piece.mat.needsUpdate = true;
+    function setInstanceIcon(id: number, iconIndex: number) {
+      if (!iconAtlas) {
+        return;
+      }
+
+      const clamped = ((iconIndex % iconAtlas.count) + iconAtlas.count) % iconAtlas.count;
+      iconIndexOf[id] = clamped;
+      const { u, v } = atlasUvOffset(clamped, iconAtlas.cols, iconAtlas.rows);
+      atlasOffsets[id * 2] = u;
+      atlasOffsets[id * 2 + 1] = v;
+      atlasAttr.needsUpdate = true;
     }
 
-    function applyCardScale(piece: CardPiece, size: number) {
-      const s = size / BASE_CARD_SIZE;
-      piece.root.scale.set(s, s, 1);
-    }
+    function writeInstance(
+      id: number,
+      pos: THREE.Vector3,
+      quat: THREE.Quaternion,
+      scale: number,
+    ) {
+      if (!cardMesh) {
+        return;
+      }
 
-    // Extrude +Z; rotate so front faces machine front (−Z).
-    function faceCamera(piece: CardPiece) {
-      piece.root.rotation.set(0, Math.PI, 0);
-      piece.root.quaternion.setFromEuler(piece.root.rotation);
-    }
-
-    function makeCardPiece(map: THREE.Texture | null): CardPiece {
-      const root = new THREE.Group();
-      const mat = makeGlossIconMaterial(map);
-      ownedMats.push(mat);
-
-      const mesh = new THREE.Mesh(cardGeo, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.renderOrder = 2;
-      root.add(mesh);
-
-      return { root, mesh, mat };
+      dummy.position.copy(pos);
+      dummy.quaternion.copy(quat);
+      dummy.scale.set(scale, scale, 1);
+      dummy.updateMatrix();
+      cardMesh.setMatrixAt(id, dummy.matrix);
+      cardMesh.instanceMatrix.needsUpdate = true;
     }
 
     function layoutCards() {
-      if (!modelRoot || shelfSeats.length === 0) {
+      if (!modelRoot || shelfSeats.length === 0 || !cardMesh) {
         return;
       }
 
       const toLocal = (world: THREE.Vector3) =>
         modelRoot!.worldToLocal(world.clone());
 
-      for (const pair of pairs) {
-        const row = rows[pair.row];
-        const seat = shelfSeats[pair.row];
+      for (const stack of stacks) {
+        const row = rows[stack.row];
+        const seat = shelfSeats[stack.row];
         const bayW = bayMaxX - bayMinX;
         const spacing =
           row.spacing > 0.001 ? row.spacing : bayW / (CARDS_PER_ROW + 0.35);
         const span = spacing * (CARDS_PER_ROW - 1);
         const startX = (bayMinX + bayMaxX) / 2 - span / 2;
-        const wx = startX + pair.slot * spacing + row.x;
+        const wx = startX + stack.slot * spacing + row.x;
         const seatY = seat.y + row.cardSize / 2 + row.y;
         const seatZ = seat.z + row.z;
 
@@ -626,29 +715,31 @@ export function VendingMachineScene() {
           continue;
         }
 
-        const frontWorld = new THREE.Vector3(wx, seatY, seatZ);
-        // back is further into the cabinet (+Z); gap == slide travel
-        const backWorld = new THREE.Vector3(
-          wx,
-          seatY,
-          seatZ + row.depthGap,
-        );
+        for (let d = 0; d < STACK_DEPTH; d += 1) {
+          const world = new THREE.Vector3(
+            wx,
+            seatY,
+            seatZ + d * row.depthGap,
+          );
+          stack.homes[d].copy(toLocal(world));
+        }
 
-        pair.frontHome.copy(toLocal(frontWorld));
-        pair.backHome.copy(toLocal(backWorld));
+        if (!stack.busy) {
+          const s = row.cardSize / BASE_CARD_SIZE;
 
-        if (!pair.busy) {
-          pair.front.root.position.copy(pair.frontHome);
-          pair.back.root.position.copy(pair.backHome);
-          faceCamera(pair.front);
-          faceCamera(pair.back);
-          applyCardScale(pair.front, row.cardSize);
-          applyCardScale(pair.back, row.cardSize);
+          for (let d = 0; d < STACK_DEPTH; d += 1) {
+            writeInstance(stack.order[d], stack.homes[d], faceQuat, s);
+          }
         }
       }
     }
 
     function placeCards(root: THREE.Object3D) {
+      if (!iconAtlas) {
+        console.warn("[vending] placeCards: no atlas");
+        return;
+      }
+
       const glass = root.getObjectByName(GLASS_MESH);
       const glassBox = glass
         ? new THREE.Box3().setFromObject(glass)
@@ -680,7 +771,6 @@ export function VendingMachineScene() {
         bayMaxX = 1.2;
       }
 
-      // absolute land: retrieval mouth — convert world → model local properly
       const landWorld = new THREE.Vector3(
         (glassBox.min.x + glassBox.max.x) / 2,
         glassBox.min.y - 0.4,
@@ -689,39 +779,50 @@ export function VendingMachineScene() {
       fallLandLocalY = root.worldToLocal(landWorld.clone()).y;
 
       console.info(
-        `[vending] seats=${shelfSeats.map((s) => s.y.toFixed(2)).join(",")} landY=${fallLandLocalY.toFixed(2)}`,
+        `[vending] seats=${shelfSeats.map((s) => s.y.toFixed(2)).join(",")} landY=${fallLandLocalY.toFixed(2)} stack=${STACK_DEPTH}`,
       );
+
+      const mat = makeAtlasCardMaterial(iconAtlas);
+      ownedMats.push(mat);
+
+      cardMesh = new THREE.InstancedMesh(cardGeo, mat, instanceCount);
+      cardMesh.castShadow = true;
+      cardMesh.receiveShadow = true;
+      cardMesh.frustumCulled = false;
+      cardMesh.renderOrder = 2;
+      root.add(cardMesh);
+
+      let nextId = 0;
 
       for (let s = 0; s < shelfSeats.length; s += 1) {
         for (let i = 0; i < CARDS_PER_ROW; i += 1) {
-          const front = makeCardPiece(pickTexture());
-          const back = makeCardPiece(pickTexture(front.mat.map));
+          const order: number[] = [];
+          const homes: THREE.Vector3[] = [];
 
-          front.root.userData.clickable = true;
-          back.root.userData.clickable = false;
-          front.root.userData.role = "front";
-          back.root.userData.role = "back";
-          front.mesh.renderOrder = 2;
-          back.mesh.renderOrder = 1;
+          for (let d = 0; d < STACK_DEPTH; d += 1) {
+            homes.push(new THREE.Vector3());
+          }
 
-          root.add(front.root);
-          root.add(back.root);
-
-          const pair: CardPair = {
-            front,
-            back,
+          const stack: CardStack = {
             row: s,
             slot: i,
-            frontHome: new THREE.Vector3(),
-            backHome: new THREE.Vector3(),
+            order,
+            homes,
             busy: false,
           };
 
-          front.root.userData.pair = pair;
-          back.root.userData.pair = pair;
-          front.mesh.userData.pair = pair;
-          back.mesh.userData.pair = pair;
-          pairs.push(pair);
+          let lastIcon = -1;
+
+          for (let d = 0; d < STACK_DEPTH; d += 1) {
+            const id = nextId;
+            nextId += 1;
+            order.push(id);
+            stackOfInstance[id] = stack;
+            lastIcon = pickIconIndex(lastIcon);
+            setInstanceIcon(id, lastIcon);
+          }
+
+          stacks.push(stack);
         }
       }
 
@@ -848,18 +949,16 @@ export function VendingMachineScene() {
         return;
       }
 
-      const prevVis: Array<{ obj: THREE.Object3D; v: boolean }> = [];
-      for (const pair of pairs) {
-        prevVis.push({ obj: pair.front.root, v: pair.front.root.visible });
-        prevVis.push({ obj: pair.back.root, v: pair.back.root.visible });
-        pair.front.root.visible = false;
-        pair.back.root.visible = false;
+      const prevVis = cardMesh ? cardMesh.visible : true;
+
+      if (cardMesh) {
+        cardMesh.visible = false;
       }
 
       const box = new THREE.Box3().setFromObject(root);
 
-      for (const entry of prevVis) {
-        entry.obj.visible = entry.v;
+      if (cardMesh) {
+        cardMesh.visible = prevVis;
       }
 
       const size = box.getSize(new THREE.Vector3());
@@ -1047,18 +1146,30 @@ export function VendingMachineScene() {
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     }
 
-    function pickFront(event: PointerEvent): CardPair | null {
+    function pickFront(event: PointerEvent): CardStack | null {
+      if (!cardMesh) {
+        return null;
+      }
+
       pointerFromEvent(event);
       raycaster.setFromCamera(pointer, camera);
-      const meshes = pairs.map((p) => p.front.mesh);
-      const hits = raycaster.intersectObjects(meshes, false);
+      const hits = raycaster.intersectObject(cardMesh, false);
 
       for (const hit of hits) {
-        const mesh = hit.object as THREE.Mesh;
-        const pair = mesh.userData.pair as CardPair | undefined;
+        const id = hit.instanceId;
 
-        if (pair && !pair.busy && pair.front.root.userData.clickable) {
-          return pair;
+        if (id === undefined || id < 0) {
+          continue;
+        }
+
+        const stack = stackOfInstance[id];
+
+        if (
+          stack &&
+          !stack.busy &&
+          stack.order[0] === id
+        ) {
+          return stack;
         }
       }
 
@@ -1069,27 +1180,28 @@ export function VendingMachineScene() {
       canvas.style.cursor = pickFront(event) ? "pointer" : "default";
     }
 
-    function startPairVend(pair: CardPair) {
-      if (pair.busy) {
+    function startStackVend(stack: CardStack) {
+      if (stack.busy || !cardMesh) {
         return;
       }
 
-      pair.busy = true;
-      pair.front.root.userData.clickable = false;
+      stack.busy = true;
 
-      const gap = rows[pair.row].depthGap;
-      const frontStart = pair.front.root.position.clone();
-      const backStart = pair.back.root.position.clone();
+      const gap = rows[stack.row].depthGap;
+      const starts: THREE.Vector3[] = [];
+      const slideEnds: THREE.Vector3[] = [];
 
-      // slide distance == depth gap → back lands on front home
-      const slideEndFront = frontStart.clone().addScaledVector(outAxis, gap);
-      const slideEndBack = backStart.clone().addScaledVector(outAxis, gap);
+      for (let d = 0; d < STACK_DEPTH; d += 1) {
+        const start = stack.homes[d].clone();
+        starts.push(start);
+        // whole stack eases forward by one gap
+        slideEnds.push(start.clone().addScaledVector(outAxis, gap));
+      }
 
-      // absolute land Y (retrieval mouth), keep slide X/Z
       const fallEnd = new THREE.Vector3(
-        slideEndFront.x,
+        slideEnds[0].x,
         fallLandLocalY,
-        slideEndFront.z,
+        slideEnds[0].z,
       ).addScaledVector(outAxis, 0.04);
 
       const rotAxis = new THREE.Vector3(
@@ -1100,77 +1212,91 @@ export function VendingMachineScene() {
       const rotAmount = THREE.MathUtils.degToRad(8 + Math.random() * 14);
 
       animations.push({
-        pair,
+        stack,
         phase: "slide",
         t0: performance.now(),
-        frontStart,
-        backStart,
-        slideEndFront,
-        slideEndBack,
+        starts,
+        slideEnds,
         fallEnd,
+        fallId: stack.order[0],
         rotAxis,
         rotAmount,
-        baseQuat: pair.front.root.quaternion.clone(),
+        baseQuat: faceQuat.clone(),
       });
     }
 
-    function finishPair(anim: PairAnim) {
-      const { pair } = anim;
-      const fallen = pair.front;
-      const revealed = pair.back;
+    function finishStack(anim: StackAnim) {
+      const { stack } = anim;
+      const scale = rows[stack.row].cardSize / BASE_CARD_SIZE;
+      const fallen = stack.order.shift()!;
+      stack.order.push(fallen);
 
-      // revealed already at frontHome from correct slide — leave it
-      fallen.root.position.copy(pair.backHome);
-      faceCamera(fallen);
-      applyCardScale(fallen, rows[pair.row].cardSize);
-      applyCardScale(revealed, rows[pair.row].cardSize);
+      // others already sit in homes[0..n-2] after the one-gap slide
+      for (let d = 0; d < STACK_DEPTH - 1; d += 1) {
+        writeInstance(stack.order[d], stack.homes[d], faceQuat, scale);
+      }
 
-      pair.front = revealed;
-      pair.back = fallen;
-      revealed.root.userData.role = "front";
-      fallen.root.userData.role = "back";
-      revealed.root.userData.clickable = true;
-      fallen.root.userData.clickable = false;
-      revealed.mesh.renderOrder = 2;
-      fallen.mesh.renderOrder = 1;
+      // fallen → furthest back
+      writeInstance(
+        fallen,
+        stack.homes[STACK_DEPTH - 1],
+        faceQuat,
+        scale,
+      );
 
-      assignMap(fallen, pickTexture(revealed.mat.map));
+      const exclude = iconIndexOf[stack.order[0]];
+      setInstanceIcon(fallen, pickIconIndex(exclude));
 
-      pair.busy = false;
+      stack.busy = false;
     }
 
     function onPointerDown(event: PointerEvent) {
-      const pair = pickFront(event);
+      const stack = pickFront(event);
 
-      if (pair) {
-        startPairVend(pair);
+      if (stack) {
+        startStackVend(stack);
       }
     }
 
     function updateAnims(now: number) {
+      if (!cardMesh) {
+        return;
+      }
+
       for (let i = animations.length - 1; i >= 0; i -= 1) {
         const anim = animations[i];
+        const scale = rows[anim.stack.row].cardSize / BASE_CARD_SIZE;
 
         if (anim.phase === "slide") {
           const u = Math.min(1, (now - anim.t0) / SLIDE_MS);
           const e = easeOutCubic(u);
-          anim.pair.front.root.position.lerpVectors(
-            anim.frontStart,
-            anim.slideEndFront,
-            e,
-          );
-          anim.pair.back.root.position.lerpVectors(
-            anim.backStart,
-            anim.slideEndBack,
-            e,
-          );
+          const pos = new THREE.Vector3();
+
+          for (let d = 0; d < STACK_DEPTH; d += 1) {
+            pos.lerpVectors(anim.starts[d], anim.slideEnds[d], e);
+            writeInstance(anim.stack.order[d], pos, faceQuat, scale);
+          }
 
           if (u >= 1) {
-            // snap back exactly onto front home
-            anim.pair.back.root.position.copy(anim.pair.frontHome);
+            // snap followers onto forward homes
+            for (let d = 1; d < STACK_DEPTH; d += 1) {
+              writeInstance(
+                anim.stack.order[d],
+                anim.stack.homes[d - 1],
+                faceQuat,
+                scale,
+              );
+            }
+
+            writeInstance(
+              anim.fallId,
+              anim.slideEnds[0],
+              faceQuat,
+              scale,
+            );
             anim.phase = "fall";
             anim.t0 = now;
-            anim.frontStart.copy(anim.slideEndFront);
+            anim.starts[0].copy(anim.slideEnds[0]);
           }
 
           continue;
@@ -1179,20 +1305,18 @@ export function VendingMachineScene() {
         if (anim.phase === "fall") {
           const u = Math.min(1, (now - anim.t0) / FALL_MS);
           const e = easeInQuad(u);
-          anim.pair.front.root.position.lerpVectors(
-            anim.frontStart,
+          const pos = new THREE.Vector3().lerpVectors(
+            anim.starts[0],
             anim.fallEnd,
             e,
           );
-
-          const q = new THREE.Quaternion().setFromAxisAngle(
-            anim.rotAxis,
-            anim.rotAmount * e,
-          );
-          anim.pair.front.root.quaternion.copy(anim.baseQuat).multiply(q);
+          scratchQuat
+            .setFromAxisAngle(anim.rotAxis, anim.rotAmount * e)
+            .premultiply(anim.baseQuat);
+          writeInstance(anim.fallId, pos, scratchQuat, scale);
 
           if (u >= 1) {
-            finishPair(anim);
+            finishStack(anim);
             animations.splice(i, 1);
           }
         }
@@ -1236,10 +1360,13 @@ export function VendingMachineScene() {
       camera,
       composer,
       renderer,
-      pairs,
+      stacks,
+      cardMesh: () => cardMesh,
       modelUrl: MODEL_URL,
       lightTune,
       postTune,
+      stackDepth: STACK_DEPTH,
+      startStackVend,
       get fallLandLocalY() {
         return fallLandLocalY;
       },
@@ -1249,17 +1376,22 @@ export function VendingMachineScene() {
 
     void (async () => {
       try {
-        const pool = await loadIconPool(ICON_POOL_LIMIT);
+        const atlas = await loadIconAtlas(ICON_POOL_LIMIT);
 
         if (disposed) {
-          pool.textures.forEach((t) => t.dispose());
+          atlas.texture.dispose();
+          const c = atlas.texture.userData.canvas as HTMLCanvasElement | undefined;
+          if (c) {
+            c.width = 0;
+            c.height = 0;
+          }
           return;
         }
 
-        iconTextures = pool.textures;
-        ownedTextures.push(...pool.textures);
+        iconAtlas = atlas;
+        ownedTextures.push(atlas.texture);
       } catch (err) {
-        console.error("[vending] icon pool failed", err);
+        console.error("[vending] icon atlas failed", err);
       }
 
       if (disposed) {
@@ -1287,7 +1419,7 @@ export function VendingMachineScene() {
             }
           });
           console.info(
-            `[vending] loaded url=${MODEL_URL} meshes=${meshCount} icons=${iconTextures.length} rows=${ROW_COUNT}`,
+            `[vending] loaded url=${MODEL_URL} meshes=${meshCount} icons=${iconAtlas?.count ?? 0} rows=${ROW_COUNT} stack=${STACK_DEPTH}`,
           );
 
           const box = new THREE.Box3().setFromObject(modelRoot);
@@ -1309,7 +1441,6 @@ export function VendingMachineScene() {
           applyNeonIntensity();
           placeGround(modelRoot);
 
-          // aim pool at glass front
           poolLight.target.position.set(
             (glassBox.min.x + glassBox.max.x) / 2,
             glassBox.min.y + 0.2,
@@ -1369,6 +1500,18 @@ export function VendingMachineScene() {
       magentaLight.dispose();
       poolLight.dispose();
 
+      if (modelRoot) {
+        if (cardMesh) {
+          modelRoot.remove(cardMesh);
+          cardMesh.dispose();
+          cardMesh = null;
+        }
+
+        disposeOwned(modelRoot);
+        scene.remove(modelRoot);
+        modelRoot = null;
+      }
+
       for (const geo of ownedGeos) {
         geo.dispose();
       }
@@ -1385,16 +1528,6 @@ export function VendingMachineScene() {
           c.width = 0;
           c.height = 0;
         }
-      }
-
-      if (modelRoot) {
-        for (const pair of pairs) {
-          modelRoot.remove(pair.front.root);
-          modelRoot.remove(pair.back.root);
-        }
-
-        disposeOwned(modelRoot);
-        scene.remove(modelRoot);
       }
 
       composer.dispose();
