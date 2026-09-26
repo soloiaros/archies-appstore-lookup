@@ -47,8 +47,8 @@ export default function HomePage() {
         <section className="home-hero" aria-label="10K">
           <div className="page-rail home-hero-inner">
             <img
-              className="home-hero-anim"
-              src="/branding/inbetween-morphing.svg"
+              className="home-hero-logo"
+              src="/branding/logo.svg"
               alt=""
               decoding="async"
               draggable={false}
