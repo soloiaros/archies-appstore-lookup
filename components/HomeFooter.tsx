@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ProButton } from "@/components/ui/ProButton";
+
 const GITHUB_REPO =
   "https://github.com/soloiaros/archies-appstore-lookup";
 
@@ -19,10 +21,6 @@ const LINKS = [
   {
     href: "/how-to-use",
     label: "How to use",
-  },
-  {
-    href: "/studio",
-    label: "Studio",
   },
 ] as const;
 
@@ -81,7 +79,11 @@ export function HomeFooter() {
   return (
     <div className="home-footer">
       <div className="home-footer-copy">
-        <p className="home-footer-mark">10K</p>
+        <img
+          className="home-footer-logo"
+          src="/branding/logo-full.svg"
+          alt="10K"
+        />
 
         <p className="home-footer-lede">
           Find App Store apps by what they do, with
@@ -102,6 +104,8 @@ export function HomeFooter() {
               {item.label}
             </Link>
           ))}
+
+          <ProButton variant="text" />
 
           <a
             className="home-footer-link"

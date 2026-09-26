@@ -1,8 +1,8 @@
-import Link from "next/link";
-
 import { HomeFaq } from "@/components/HomeFaq";
 
 import { HomeFooter } from "@/components/HomeFooter";
+
+import { HomeHeroActions } from "@/components/HomeHeroActions";
 
 import { SectionPage } from "@/components/DirectionalPage";
 
@@ -30,52 +30,40 @@ const STEPS = [
   },
 ] as const;
 
-function heroScene() {
+function indexedCount() {
   try {
-    const scene = pileScene(5);
-
-    return {
-      indexed: scene.indexed,
-
-      icons: scene.icons.slice(0, 5),
-    };
+    return pileScene(1).indexed;
   } catch {
-    return {
-      indexed: 0,
-
-      icons: [],
-    };
+    return 0;
   }
 }
 
 export default function HomePage() {
-  const scene = heroScene();
+  const indexed = indexedCount();
 
   return (
     <SectionPage>
       <main className="home">
-        <div className="page-rail home-top">
-          <section className="home-hero" aria-label="10K">
-            {scene.icons.length > 0 ? (
-              <div className="home-hero-tiles" aria-hidden>
-                {scene.icons.map((icon) => (
-                  <span
-                    key={icon.trackId}
-                    className="home-hero-tile"
-                  >
-                    <img
-                      src={icon.iconUrl}
-                      alt=""
-                    />
-                  </span>
-                ))}
-              </div>
-            ) : null}
+        <section className="home-hero" aria-label="10K">
+          <div className="page-rail home-hero-inner">
+            <object
+              className="home-hero-anim"
+              type="image/svg+xml"
+              data="/branding/inbetween-morphing.svg"
+              aria-hidden
+              tabIndex={-1}
+            >
+              <img
+                className="home-hero-anim"
+                src="/branding/inbetween-morphing.svg"
+                alt=""
+              />
+            </object>
 
-            {scene.indexed > 0 ? (
+            {indexed > 0 ? (
               <p className="home-hero-badge">
                 <span>
-                  {scene.indexed.toLocaleString("en-US")}
+                  {indexed.toLocaleString("en-US")}
                 </span>
                 <span className="home-hero-badge-dim">
                   apps indexed
@@ -92,24 +80,11 @@ export default function HomePage() {
               Every field shows what is actually known.
             </p>
 
-            <div className="home-hero-actions">
-              <Link
-                href="/search"
-                className="home-hero-btn home-hero-btn-primary"
-                transitionTypes={["section"]}
-              >
-                Search
-              </Link>
+            <HomeHeroActions />
+          </div>
+        </section>
 
-              <Link
-                href="/how-to-use"
-                className="home-hero-btn home-hero-btn-secondary"
-                transitionTypes={["section"]}
-              >
-                How to use
-              </Link>
-            </div>
-          </section>
+        <div className="page-rail home-rest">
 
           <section
             className="home-block"
