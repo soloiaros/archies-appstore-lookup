@@ -1366,16 +1366,16 @@ ol {
   text-align: center;
 }
 
-.home-hero-logo {
+.home-hero-anim {
   display: block;
   width: min(240px, 52vw);
-  aspect-ratio: 852 / 912;
+  aspect-ratio: 669 / 609;
   height: auto;
   margin: 0 0 3.25rem;
   border: 0;
   background: transparent;
   pointer-events: none;
-  filter: brightness(0) invert(1);
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .home-rest {
