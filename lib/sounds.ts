@@ -8,6 +8,9 @@ const FALL_SRC = "/sounds/vending_machine_fall.mp3";
 
 const BUTTON_SRC = "/sounds/button_press.mp3";
 
+/** Relative to default HTMLAudioElement volume (1). */
+const FALL_VOLUME = 0.45;
+
 const POOL = 4;
 
 type Pool = {
@@ -36,7 +39,7 @@ function getPool(src: string): Pool {
   return pool;
 }
 
-function playSrc(src: string): void {
+function playSrc(src: string, volume = 1): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -45,6 +48,7 @@ function playSrc(src: string): void {
   const audio = pool.slots[pool.next];
   pool.next = (pool.next + 1) % pool.slots.length;
 
+  audio.volume = volume;
   audio.currentTime = 0;
   void audio.play().catch(() => {});
 }
@@ -55,12 +59,9 @@ export function playCoinSound(): void {
 }
 
 export function playFallSound(): void {
-  playSrc(FALL_SRC);
+  playSrc(FALL_SRC, FALL_VOLUME);
 }
 
 export function playButtonSound(): void {
   playSrc(BUTTON_SRC);
 }
-
-/** Fall cue fires this many ms before FALL_MS ends. */
-export const FALL_SOUND_LEAD_MS = 200;
