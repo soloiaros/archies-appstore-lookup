@@ -1,3 +1,5 @@
+import { HomeFooter } from "@/components/HomeFooter";
+
 import { SectionPage } from "@/components/DirectionalPage";
 
 import { VendingMachineScene } from "@/components/VendingMachineScene";
@@ -10,9 +12,10 @@ export default function HomePage() {
           <h1 className="home-hero-title">10K</h1>
         </section>
 
-        <section className="home-machine" aria-label="Vending machine">
+        <footer className="home-machine" aria-label="Site footer">
           <VendingMachineScene />
-        </section>
+          <HomeFooter />
+        </footer>
       </main>
     </SectionPage>
   );
