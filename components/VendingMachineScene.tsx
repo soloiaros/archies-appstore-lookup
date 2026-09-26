@@ -513,35 +513,37 @@ export function VendingMachineScene() {
     canvas.style.height = "100%";
     canvas.style.background = "transparent";
 
-    // low ambient — neons + off-screen wash carry the mood
-    const ambientLight = new THREE.AmbientLight(0x8a90a0, 0.34);
+    // side practicals
+    const ambientLight = new THREE.AmbientLight(0x8a90a0, 0.22);
     const hemiLight = new THREE.HemisphereLight(0x4a5568, 0x0c0c10, 0.4);
     hemiLight.position.set(0, 14, 0);
     scene.add(ambientLight, hemiLight);
 
-    // off-screen magenta (screen-left / −X) — neon neighbor wash
-    const magentaLight = new THREE.PointLight(0xff2d9a, 48, 28, 1.2);
-    magentaLight.position.set(-4.2, 2.8, -5.5);
+    // candela, close
+    const magentaLight = new THREE.PointLight(0xff2d9a, 380, 12, 2);
+    magentaLight.position.set(-5.6, 2.6, -2.8);
     scene.add(magentaLight);
 
-    // soft purple floor spill, also off-frame left-front
     const magentaFill = new THREE.SpotLight(
       0xe020a8,
-      55,
-      36,
-      Math.PI / 2.6,
-      0.82,
-      1.1,
+      260,
+      14,
+      Math.PI / 4,
+      0.75,
+      2,
     );
-    magentaFill.position.set(-6.5, 4.2, -8);
-    magentaFill.target.position.set(-0.8, 0.5, -2);
+    magentaFill.position.set(-5.2, 0.2, -4.2);
+    magentaFill.target.position.set(-1.2, -4.2, -2.4);
     scene.add(magentaFill, magentaFill.target);
 
-    // cool practical from screen-right (+X)
-    const coolKey = new THREE.DirectionalLight(0xb9d6ff, 0.75);
-    coolKey.position.set(8, 6.5, -3);
-    coolKey.target.position.set(0.2, 0.5, -1);
+    const coolKey = new THREE.DirectionalLight(0xd0e4ff, 2.2);
+    coolKey.position.set(9, 5, -2);
+    coolKey.target.position.set(1.2, 0.4, -0.4);
     scene.add(coolKey, coolKey.target);
+
+    const coolPoint = new THREE.PointLight(0xc5dcff, 220, 10, 2);
+    coolPoint.position.set(5.4, 1.8, -2.6);
+    scene.add(coolPoint);
 
     // cool pool in front of glass onto asphalt
     const poolLight = new THREE.SpotLight(0xd8f4ff, 9, 36, Math.PI / 3.8, 0.7, 1.25);
@@ -647,18 +649,19 @@ export function VendingMachineScene() {
     };
 
     const lightTune = {
-      ambient: 0.34,
+      ambient: 0.22,
       hemi: 0.4,
       neon: 0.7,
-      magenta: 48,
-      magentaFill: 55,
-      cool: 0.75,
+      magenta: 380,
+      magentaFill: 260,
+      cool: 2.2,
+      coolPoint: 220,
       pool: 9,
       fog: 0.018,
       ambientColor: "#8a90a0",
       neonColor: "#c8f0ff",
       magentaColor: "#ff2d9a",
-      coolColor: "#b9d6ff",
+      coolColor: "#d0e4ff",
     };
 
     const vendTune = {
@@ -1133,20 +1136,26 @@ export function VendingMachineScene() {
         .add(lightTune, "neon", 0, 3, 0.01)
         .onChange(() => applyNeonIntensity());
       lightFolder
-        .add(lightTune, "magenta", 0, 60, 0.05)
+        .add(lightTune, "magenta", 0, 1200, 1)
         .onChange((v: number) => {
           magentaLight.intensity = v;
         });
       lightFolder
-        .add(lightTune, "magentaFill", 0, 80, 0.1)
+        .add(lightTune, "magentaFill", 0, 1500, 1)
         .name("magenta fill")
         .onChange((v: number) => {
           magentaFill.intensity = v;
         });
       lightFolder
-        .add(lightTune, "cool", 0, 3, 0.01)
+        .add(lightTune, "cool", 0, 12, 0.05)
         .onChange((v: number) => {
           coolKey.intensity = v;
+        });
+      lightFolder
+        .add(lightTune, "coolPoint", 0, 800, 1)
+        .name("cool point")
+        .onChange((v: number) => {
+          coolPoint.intensity = v;
         });
       lightFolder.add(lightTune, "pool", 0, 20, 0.1).onChange((v: number) => {
         poolLight.intensity = v;
@@ -1164,6 +1173,7 @@ export function VendingMachineScene() {
       });
       lightFolder.addColor(lightTune, "coolColor").onChange((v: string) => {
         coolKey.color.set(v);
+        coolPoint.color.set(v);
       });
 
       const vendFolder = gui.addFolder("Vend anim");
@@ -1522,18 +1532,7 @@ export function VendingMachineScene() {
           );
           poolLight.target.updateMatrixWorld();
 
-          magentaFill.target.position.set(
-            (glassBox.min.x + glassBox.max.x) / 2 - 0.8,
-            glassBox.min.y + 1.4,
-            glassBox.min.z - 1.2,
-          );
           magentaFill.target.updateMatrixWorld();
-
-          coolKey.target.position.set(
-            (glassBox.min.x + glassBox.max.x) / 2,
-            glassBox.min.y + 2.4,
-            glassBox.min.z + 0.4,
-          );
           coolKey.target.updateMatrixWorld();
 
           placeCards(modelRoot);
@@ -1587,11 +1586,13 @@ export function VendingMachineScene() {
       scene.remove(magentaFill.target);
       scene.remove(coolKey);
       scene.remove(coolKey.target);
+      scene.remove(coolPoint);
       scene.remove(poolLight);
       scene.remove(poolLight.target);
       magentaLight.dispose();
       magentaFill.dispose();
       coolKey.dispose();
+      coolPoint.dispose();
       poolLight.dispose();
 
       if (modelRoot) {
