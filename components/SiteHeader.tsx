@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 
 import { Key } from "@/components/ui/Key";
 
+import { playButtonSound } from "@/lib/sounds";
+
 const NAV = [
   {
     href: "/search",
@@ -78,6 +80,7 @@ export function SiteHeader() {
           aria-label="10K home"
           aria-current={home ? "page" : undefined}
           transitionTypes={["section"]}
+          onClick={() => playButtonSound()}
         >
           <span className="brand-plate" aria-hidden>
             <BrandMark />
@@ -100,6 +103,7 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 current={current}
+                onClick={() => playButtonSound()}
               >
                 {item.label}
               </Key>
@@ -115,6 +119,7 @@ export function SiteHeader() {
           target="_blank"
           rel="noreferrer"
           aria-label="GitHub repository"
+          onClick={() => playButtonSound()}
         >
           <GitHubMark />
           <span className="ui-key-label">GitHub</span>

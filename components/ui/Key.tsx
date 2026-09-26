@@ -1,12 +1,13 @@
 import Link from "next/link";
 
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 
 export function Key({
   href,
   current = false,
   children,
   className,
+  onClick,
 }: {
   href: string;
 
@@ -15,6 +16,8 @@ export function Key({
   children: ReactNode;
 
   className?: string;
+
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   const classes = ["ui-key", className]
     .filter(Boolean)
@@ -26,6 +29,7 @@ export function Key({
       className={classes}
       aria-current={current ? "page" : undefined}
       transitionTypes={["section"]}
+      onClick={onClick}
     >
       <span className="ui-key-label">{children}</span>
     </Link>

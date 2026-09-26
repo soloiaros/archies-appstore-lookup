@@ -11,6 +11,12 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
+import {
+  FALL_SOUND_LEAD_MS,
+  playCoinSound,
+  playFallSound,
+} from "@/lib/sounds";
+
 /**
  * Served asset: public/vending_machine_optimized.glb
  * (copy of vending_machine_optimized._lights_full.glb).
@@ -90,6 +96,7 @@ type StackAnim = {
   rotAxis: THREE.Vector3;
   rotAmount: number;
   baseQuat: THREE.Quaternion;
+  fallSoundPlayed: boolean;
 };
 
 type IconAtlas = {
@@ -1211,6 +1218,8 @@ export function VendingMachineScene() {
       ).normalize();
       const rotAmount = THREE.MathUtils.degToRad(8 + Math.random() * 14);
 
+      playCoinSound();
+
       animations.push({
         stack,
         phase: "slide",
@@ -1222,6 +1231,7 @@ export function VendingMachineScene() {
         rotAxis,
         rotAmount,
         baseQuat: faceQuat.clone(),
+        fallSoundPlayed: false,
       });
     }
 
@@ -1303,7 +1313,8 @@ export function VendingMachineScene() {
         }
 
         if (anim.phase === "fall") {
-          const u = Math.min(1, (now - anim.t0) / FALL_MS);
+          const elapsed = now - anim.t0;
+          const u = Math.min(1, elapsed / FALL_MS);
           const e = easeInQuad(u);
           const pos = new THREE.Vector3().lerpVectors(
             anim.starts[0],
@@ -1314,6 +1325,14 @@ export function VendingMachineScene() {
             .setFromAxisAngle(anim.rotAxis, anim.rotAmount * e)
             .premultiply(anim.baseQuat);
           writeInstance(anim.fallId, pos, scratchQuat, scale);
+
+          if (
+            !anim.fallSoundPlayed
+            && elapsed >= FALL_MS - FALL_SOUND_LEAD_MS
+          ) {
+            anim.fallSoundPlayed = true;
+            playFallSound();
+          }
 
           if (u >= 1) {
             finishStack(anim);
