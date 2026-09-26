@@ -22,7 +22,20 @@ const LINKS = [
     href: "/how-to-use",
     label: "How to use",
   },
+  {
+    href: "/terms",
+    label: "Terms",
+  },
+  {
+    href: "/privacy",
+    label: "Privacy",
+  },
+  {
+    href: "/refund",
+    label: "Refunds",
+  },
 ] as const;
+
 
 function InstagramIcon() {
   return (
@@ -86,8 +99,7 @@ export function HomeFooter() {
         />
 
         <p className="home-footer-lede">
-          Find App Store apps by what they do, with
-          provenance on every field.
+          Research thousands of competitor apps, in seconds.
         </p>
 
         <nav
