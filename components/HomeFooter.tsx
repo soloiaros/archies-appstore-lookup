@@ -24,8 +24,8 @@ export function HomeFooter() {
       <p className="home-footer-mark">10K</p>
 
       <p className="home-footer-lede">
-        Find App Store apps by what they do, with provenance on every
-        field.
+        Find App Store apps by what they do, with
+        provenance on every field.
       </p>
 
       <nav

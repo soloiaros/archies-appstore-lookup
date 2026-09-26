@@ -12,7 +12,6 @@ import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js"
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 
 import {
-  FALL_SOUND_LEAD_MS,
   playCoinSound,
   playFallSound,
 } from "@/lib/sounds";
@@ -49,9 +48,14 @@ const CARD_DEPTH = 0.032;
 /** Matches tuned default cardSize. */
 const BASE_CARD_SIZE = 0.72;
 
-const SLIDE_MS = 900;
+const DEFAULT_SLIDE_MS = 900;
 
-const FALL_MS = 780;
+const DEFAULT_FALL_MS = 780;
+
+/** Fall tumble range (degrees). */
+const DEFAULT_ROT_MIN_DEG = 8;
+
+const DEFAULT_ROT_SPAN_DEG = 14;
 
 /** Tuned photographic framing (do not auto-fit over these). */
 const FOCAL_LENGTH_MM = 36.5;
@@ -96,7 +100,6 @@ type StackAnim = {
   rotAxis: THREE.Vector3;
   rotAmount: number;
   baseQuat: THREE.Quaternion;
-  fallSoundPlayed: boolean;
 };
 
 type IconAtlas = {
@@ -636,6 +639,13 @@ export function VendingMachineScene() {
       magentaColor: "#ff2d8a",
     };
 
+    const vendTune = {
+      slideMs: DEFAULT_SLIDE_MS,
+      fallMs: DEFAULT_FALL_MS,
+      rotMinDeg: DEFAULT_ROT_MIN_DEG,
+      rotSpanDeg: DEFAULT_ROT_SPAN_DEG,
+    };
+
     function shelfSeat(
       index: number,
       count: number,
@@ -1119,6 +1129,20 @@ export function VendingMachineScene() {
         magentaLight.color.set(v);
       });
 
+      const vendFolder = gui.addFolder("Vend anim");
+      vendFolder
+        .add(vendTune, "slideMs", 100, 2500, 10)
+        .name("slide ms");
+      vendFolder
+        .add(vendTune, "fallMs", 100, 2500, 10)
+        .name("fall ms");
+      vendFolder
+        .add(vendTune, "rotMinDeg", 0, 40, 0.5)
+        .name("rot min °");
+      vendFolder
+        .add(vendTune, "rotSpanDeg", 0, 40, 0.5)
+        .name("rot span °");
+
       applyPostTune();
       applyFogTune();
     }
@@ -1216,7 +1240,9 @@ export function VendingMachineScene() {
         (Math.random() - 0.5) * 0.35,
         (Math.random() - 0.5) * 0.6,
       ).normalize();
-      const rotAmount = THREE.MathUtils.degToRad(8 + Math.random() * 14);
+      const rotAmount = THREE.MathUtils.degToRad(
+        vendTune.rotMinDeg + Math.random() * vendTune.rotSpanDeg,
+      );
 
       playCoinSound();
 
@@ -1231,7 +1257,6 @@ export function VendingMachineScene() {
         rotAxis,
         rotAmount,
         baseQuat: faceQuat.clone(),
-        fallSoundPlayed: false,
       });
     }
 
@@ -1278,7 +1303,7 @@ export function VendingMachineScene() {
         const scale = rows[anim.stack.row].cardSize / BASE_CARD_SIZE;
 
         if (anim.phase === "slide") {
-          const u = Math.min(1, (now - anim.t0) / SLIDE_MS);
+          const u = Math.min(1, (now - anim.t0) / vendTune.slideMs);
           const e = easeOutCubic(u);
           const pos = new THREE.Vector3();
 
@@ -1314,7 +1339,7 @@ export function VendingMachineScene() {
 
         if (anim.phase === "fall") {
           const elapsed = now - anim.t0;
-          const u = Math.min(1, elapsed / FALL_MS);
+          const u = Math.min(1, elapsed / vendTune.fallMs);
           const e = easeInQuad(u);
           const pos = new THREE.Vector3().lerpVectors(
             anim.starts[0],
@@ -1326,15 +1351,8 @@ export function VendingMachineScene() {
             .premultiply(anim.baseQuat);
           writeInstance(anim.fallId, pos, scratchQuat, scale);
 
-          if (
-            !anim.fallSoundPlayed
-            && elapsed >= FALL_MS - FALL_SOUND_LEAD_MS
-          ) {
-            anim.fallSoundPlayed = true;
-            playFallSound();
-          }
-
           if (u >= 1) {
+            playFallSound();
             finishStack(anim);
             animations.splice(i, 1);
           }
