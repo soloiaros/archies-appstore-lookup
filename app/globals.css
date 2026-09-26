@@ -18,6 +18,12 @@
 :root {
   --page-inset: max(1.5rem, env(safe-area-inset-left));
   --page-inset-end: max(1.5rem, env(safe-area-inset-right));
+  --page-pad: max(
+    1.5rem,
+    min(4.5rem, 5.5vw),
+    env(safe-area-inset-left),
+    env(safe-area-inset-right)
+  );
   --neo-hi: rgb(255 255 255 / 0.07);
   --neo-shade: rgb(0 0 0 / 0.28);
   --neo-contact: rgb(0 0 0 / 0.18);
@@ -968,9 +974,9 @@ ol {
   min-height: 3.25rem;
   padding:
     max(0.65rem, env(safe-area-inset-top))
-    var(--page-inset-end)
+    var(--page-pad)
     0.65rem
-    var(--page-inset);
+    var(--page-pad);
   box-sizing: border-box;
   border-bottom: 1px solid rgb(255 255 255 / 0.04);
   background: var(--color-ink);
@@ -1195,6 +1201,80 @@ ol {
   min-height: 100%;
   box-sizing: border-box;
   padding-top: 3.25rem;
+  padding-inline: var(--page-pad);
+}
+
+.guide {
+  padding-top: calc(3.25rem + clamp(2.75rem, 7vh, 4.75rem));
+  padding-bottom: clamp(3rem, 8vh, 6rem);
+}
+
+.guide-title {
+  margin: 0 auto;
+  max-width: 22em;
+  text-align: center;
+  font-size: clamp(1.45rem, 2.6vw, 1.9rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.28;
+}
+
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: clamp(2rem, 4.5vh, 3rem) 0 0;
+}
+
+.guide-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+  padding: 1.45rem 1.2rem 1.55rem;
+  border-radius: 18px;
+  background: var(--color-panel);
+  text-align: center;
+}
+
+.guide-card h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.guide-card p {
+  margin: 0.5rem auto 0;
+  max-width: 32ch;
+  color: var(--color-muted);
+  font-size: 0.925rem;
+  line-height: 1.45;
+}
+
+.guide-close {
+  margin: clamp(3.5rem, 9vh, 5.75rem) 0 0;
+  padding: clamp(2.75rem, 7vh, 4.5rem) 1.75rem;
+  border-radius: 28px;
+  background: #121214;
+  text-align: center;
+}
+
+.guide-close h2 {
+  margin: 0 auto;
+  max-width: 16em;
+  font-size: clamp(1.3rem, 2.2vw, 1.65rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.guide-close p {
+  margin: 0.85rem auto 0;
+  max-width: 46ch;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
 
 .home {
@@ -1271,7 +1351,7 @@ ol {
     clamp(5rem, 14vh, 7.5rem)
     1.75rem
     clamp(2rem, 5vh, 3.25rem)
-    var(--page-inset);
+    var(--page-pad);
   pointer-events: none;
 }
 
@@ -1442,7 +1522,7 @@ ol {
       1.25rem
       1rem
       max(1.5rem, env(safe-area-inset-bottom))
-      var(--page-inset);
+      var(--page-pad);
   }
 
   .home-footer-copy {
@@ -1499,6 +1579,14 @@ ol {
 
   .shell {
     padding-top: 5.5rem;
+  }
+
+  .guide {
+    padding-top: calc(5.5rem + 1.75rem);
+  }
+
+  .guide-grid {
+    grid-template-columns: 1fr;
   }
 }
 
