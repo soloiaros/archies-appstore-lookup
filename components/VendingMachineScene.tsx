@@ -1074,7 +1074,16 @@ export function VendingMachineScene() {
 
       document.querySelectorAll(".lil-gui").forEach((el) => el.remove());
 
-      gui = new GUI({ title: "Vending tune" });
+      gui = new GUI({
+        title: "Vending tune",
+        container: mount,
+      });
+      gui.domElement.style.position = "absolute";
+      gui.domElement.style.top = "8px";
+      gui.domElement.style.right = "8px";
+      gui.domElement.style.left = "auto";
+      gui.domElement.style.maxHeight = "calc(100% - 16px)";
+      gui.domElement.style.overflow = "auto";
       gui.domElement.style.zIndex = "40";
 
       const camFolder = gui.addFolder("Camera");

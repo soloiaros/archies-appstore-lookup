@@ -73,7 +73,8 @@ export function SiteHeader() {
       className="site-header"
       style={{ viewTransitionName: "site-header" }}
     >
-      <div className="site-header-start">
+      <div className="page-rail site-header-bar">
+        <div className="site-header-start">
         <Link
           href="/"
           className="brand"
@@ -110,9 +111,9 @@ export function SiteHeader() {
             );
           })}
         </nav>
-      </div>
+        </div>
 
-      <div className="site-header-end">
+        <div className="site-header-end">
         <a
           className="ui-key ui-key-ghost"
           href={GITHUB}
@@ -124,6 +125,7 @@ export function SiteHeader() {
           <GitHubMark />
           <span className="ui-key-label">GitHub</span>
         </a>
+        </div>
       </div>
     </header>
   );
