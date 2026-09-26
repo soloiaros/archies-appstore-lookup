@@ -1264,55 +1264,70 @@ ol {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 1.15rem;
-  width: min(26rem, 36%);
+  gap: clamp(2.25rem, 5.5vh, 3.75rem);
+  width: min(44rem, 48%);
   max-width: 100%;
   padding:
-    clamp(7rem, 26vh, 13rem)
-    1.5rem
-    2rem
+    clamp(5rem, 14vh, 7.5rem)
+    1.75rem
+    clamp(2rem, 5vh, 3.25rem)
     var(--page-inset);
   pointer-events: none;
 }
 
+.home-footer-copy,
+.home-footer-meta,
 .home-footer-mark,
 .home-footer-lede,
 .home-footer-nav,
 .home-footer-note,
-.home-footer-link {
+.home-footer-link,
+.home-footer-credit,
+.home-footer-credit-link,
+.home-footer-social,
+.home-footer-social-btn {
   pointer-events: auto;
+}
+
+.home-footer-copy {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.4rem, 3.5vh, 2.35rem);
+  max-width: 28ch;
 }
 
 .home-footer-mark {
   margin: 0;
   color: var(--color-text);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 1;
+  font-size: clamp(3.5rem, 8vw, 6.25rem);
+  font-weight: 700;
+  letter-spacing: -0.07em;
+  line-height: 0.88;
 }
 
 .home-footer-lede {
   margin: 0;
-  max-width: 34ch;
+  max-width: 22ch;
   color: var(--color-muted);
-  font-size: 0.9375rem;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.35rem, 2.4vw, 1.85rem);
+  font-weight: 450;
+  line-height: 1.25;
+  letter-spacing: -0.032em;
   text-wrap: pretty;
 }
 
 .home-footer-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1.35rem;
-  margin-top: 0.15rem;
+  gap: 0.75rem 1.75rem;
+  margin-top: 0.5rem;
 }
 
 .home-footer-link {
   color: var(--color-muted);
-  font-size: 0.8125rem;
-  letter-spacing: -0.01em;
+  font-size: clamp(1.05rem, 1.3vw, 1.2rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
   line-height: 1.2;
   text-decoration: none;
 }
@@ -1327,12 +1342,91 @@ ol {
   border-radius: 2px;
 }
 
+.home-footer-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.15rem;
+  margin-top: auto;
+  padding-top: clamp(1.5rem, 4vh, 3rem);
+}
+
+.home-footer-credit {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: clamp(1.05rem, 1.35vw, 1.25rem);
+  font-weight: 450;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+}
+
+.home-footer-credit-link {
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  text-decoration-thickness: 1px;
+}
+
+.home-footer-credit-link:hover {
+  color: #fff;
+}
+
+.home-footer-credit-link:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.35);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.home-footer-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.home-footer-social-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  color: var(--color-muted);
+  background: var(--neo-key);
+  border-radius: 0.55rem;
+  box-shadow:
+    inset 0 1px 0 var(--neo-hi),
+    inset 0 -1px 0 var(--neo-shade),
+    0 1px 2px var(--neo-contact);
+  text-decoration: none;
+  transition:
+    transform var(--neo-press),
+    box-shadow var(--neo-press),
+    color var(--neo-press);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-footer-social-btn:hover {
+  color: var(--color-text);
+}
+
+.home-footer-social-btn:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 2px 5px var(--neo-shade),
+    inset 0 1px 0 rgb(255 255 255 / 0.02);
+}
+
+.home-footer-social-btn:focus-visible {
+  outline: 1px solid rgb(255 255 255 / 0.35);
+  outline-offset: 3px;
+}
+
 .home-footer-note {
   margin: 0.2rem 0 0;
-  max-width: 34ch;
+  max-width: 28ch;
   color: var(--color-faint);
-  font-size: 0.6875rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  line-height: 1.45;
   letter-spacing: 0;
 }
 
@@ -1340,10 +1434,10 @@ ol {
   .home-footer {
     top: auto;
     bottom: 0;
-    width: min(100%, 22rem);
-    max-height: 42%;
+    width: min(100%, 28rem);
+    max-height: 58%;
     justify-content: flex-end;
-    gap: 0.9rem;
+    gap: 1.35rem;
     padding:
       1.25rem
       1rem
@@ -1351,13 +1445,33 @@ ol {
       var(--page-inset);
   }
 
+  .home-footer-copy {
+    max-width: 100%;
+    gap: 0.85rem;
+  }
+
   .home-footer-mark {
-    font-size: 1.25rem;
+    font-size: clamp(2.5rem, 12vw, 3.6rem);
   }
 
   .home-footer-lede {
-    max-width: 32ch;
-    font-size: 0.875rem;
+    max-width: 26ch;
+    font-size: 1.1rem;
+  }
+
+  .home-footer-link {
+    font-size: 0.95rem;
+  }
+
+  .home-footer-meta {
+    gap: 0.75rem;
+    margin-top: 0;
+    padding-top: 0;
+  }
+
+  .home-footer-social-btn {
+    width: 2.6rem;
+    height: 2.6rem;
   }
 
   .home-footer-note {
