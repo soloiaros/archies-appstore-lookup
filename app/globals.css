@@ -1374,8 +1374,8 @@ ol {
   margin: 0 0 3.25rem;
   border: 0;
   background: transparent;
-  color-scheme: only dark;
   pointer-events: none;
+  filter: invert(1) hue-rotate(180deg);
 }
 
 .home-rest {

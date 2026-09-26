@@ -46,19 +46,13 @@ export default function HomePage() {
       <main className="home">
         <section className="home-hero" aria-label="10K">
           <div className="page-rail home-hero-inner">
-            <object
+            <img
               className="home-hero-anim"
-              type="image/svg+xml"
-              data="/branding/inbetween-morphing.svg"
-              aria-hidden
-              tabIndex={-1}
-            >
-              <img
-                className="home-hero-anim"
-                src="/branding/inbetween-morphing.svg"
-                alt=""
-              />
-            </object>
+              src="/branding/inbetween-morphing.svg"
+              alt=""
+              decoding="async"
+              draggable={false}
+            />
 
             {indexed > 0 ? (
               <p className="home-hero-badge">
