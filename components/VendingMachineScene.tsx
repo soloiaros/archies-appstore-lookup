@@ -28,8 +28,6 @@ const BLINK_MESH = "blinking_light";
 
 const CARDS_PER_ROW = 4;
 
-const ICON_TEX_SIZE = 128;
-
 /** Superellipse exponent — iOS continuous-corner feel. */
 const SQUIRCLE_N = 5;
 
@@ -43,11 +41,11 @@ const SLIDE_MS = 900;
 const FALL_MS = 780;
 
 /** Tuned photographic framing (do not auto-fit over these). */
-const FOCAL_LENGTH_MM = 38.5;
+const FOCAL_LENGTH_MM = 36.5;
 
 const FILM_GAUGE_MM = 36;
 
-const ICON_POOL_LIMIT = 40;
+const ICON_POOL_LIMIT = 50;
 
 const PAGE_INK = 0x0b0b0c;
 
@@ -64,8 +62,8 @@ type RowTune = {
 
 type CardPiece = {
   root: THREE.Group;
-  face: THREE.Mesh;
-  body: THREE.Mesh;
+  mesh: THREE.Mesh;
+  mat: THREE.MeshPhysicalMaterial;
 };
 
 type CardPair = {
@@ -138,7 +136,10 @@ function makeSquircleShape(size: number, n = SQUIRCLE_N): THREE.Shape {
   return shape;
 }
 
-function makeCardBodyGeometry(size: number): THREE.ExtrudeGeometry {
+/**
+ * Extrude with silhouette XY UVs (0–1) so one glossy icon covers the whole box.
+ */
+function makeCardGeometry(size: number): THREE.ExtrudeGeometry {
   const shape = makeSquircleShape(size);
   const geo = new THREE.ExtrudeGeometry(shape, {
     depth: CARD_DEPTH,
@@ -151,86 +152,53 @@ function makeCardBodyGeometry(size: number): THREE.ExtrudeGeometry {
   });
 
   geo.center();
-  geo.computeVertexNormals();
-  return geo;
-}
 
-function makeFaceGeometry(size: number): THREE.PlaneGeometry {
-  // PlaneGeometry has clean 0..1 UVs — ShapeGeometry was smearing icons into wedges
-  const geo = new THREE.PlaneGeometry(size * 0.94, size * 0.94);
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function fillSquirclePath(ctx: CanvasRenderingContext2D, size: number) {
+  const pos = geo.attributes.position;
   const half = size / 2;
-  const cx = size / 2;
-  const cy = size / 2;
-  const segments = 64;
 
-  ctx.beginPath();
-
-  for (let i = 0; i <= segments; i += 1) {
-    const p = squirclePoint(half, i / segments, SQUIRCLE_N);
-
-    if (i === 0) {
-      ctx.moveTo(cx + p.x, cy - p.y);
-    } else {
-      ctx.lineTo(cx + p.x, cy - p.y);
-    }
+  if (!geo.attributes.uv) {
+    geo.setAttribute(
+      "uv",
+      new THREE.BufferAttribute(new Float32Array(pos.count * 2), 2),
+    );
   }
 
-  ctx.closePath();
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+
+  for (let i = 0; i < pos.count; i += 1) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const u = THREE.MathUtils.clamp((x / half) * 0.5 + 0.5, 0, 1);
+    const v = THREE.MathUtils.clamp((y / half) * 0.5 + 0.5, 0, 1);
+    uv.setXY(i, u, v);
+  }
+
+  uv.needsUpdate = true;
+  geo.clearGroups();
+  geo.computeVertexNormals();
+  return geo;
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
+function loadTexture(url: string, loader: THREE.TextureLoader): Promise<THREE.Texture> {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.decoding = "async";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error(`icon load failed: ${url}`));
-    img.src = url;
+    loader.load(
+      url,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.anisotropy = 4;
+        tex.generateMipmaps = true;
+        tex.minFilter = THREE.LinearMipmapLinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.wrapS = THREE.ClampToEdgeWrapping;
+        tex.wrapT = THREE.ClampToEdgeWrapping;
+        tex.userData.sourceUrl = url;
+        tex.userData.ownsTexture = true;
+        resolve(tex);
+      },
+      undefined,
+      () => reject(new Error(`icon load failed: ${url}`)),
+    );
   });
-}
-
-async function bakeIconTexture(
-  url: string,
-  size: number,
-): Promise<THREE.CanvasTexture> {
-  const img = await loadImage(url);
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d", { alpha: true });
-
-  if (!ctx) {
-    throw new Error("2d context unavailable");
-  }
-
-  // image first, then destination-in squircle (never draw a colored mask on top)
-  ctx.clearRect(0, 0, size, size);
-  ctx.drawImage(img, 0, 0, size, size);
-  ctx.globalCompositeOperation = "destination-in";
-  fillSquirclePath(ctx, size);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.globalCompositeOperation = "source-over";
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.flipY = true;
-  tex.needsUpdate = true;
-  tex.userData.ownsTexture = true;
-  tex.userData.canvas = canvas;
-  tex.userData.sourceUrl = url;
-
-  return tex;
 }
 
 async function loadIconPool(
@@ -248,33 +216,41 @@ async function loadIconPool(
   };
 
   console.info(
-    `[vending] loading ${body.icons.length} popular icons (api count=${body.count})`,
+    `[vending] loading ${body.icons.length} WebP icons (api count=${body.count})`,
   );
 
+  THREE.Cache.enabled = true;
+  const loader = new THREE.TextureLoader();
+
   const settled = await Promise.allSettled(
-    body.icons.map((icon) => bakeIconTexture(icon.src, ICON_TEX_SIZE)),
+    body.icons.map((icon) => loadTexture(icon.src, loader)),
   );
 
   const textures: THREE.Texture[] = [];
+  const seen = new Set<string>();
 
   for (let i = 0; i < settled.length; i += 1) {
     const result = settled[i];
 
     if (result.status === "fulfilled") {
+      const url = String(result.value.userData.sourceUrl ?? "");
+
+      if (url && seen.has(url)) {
+        result.value.dispose();
+        continue;
+      }
+
+      if (url) {
+        seen.add(url);
+      }
+
       textures.push(result.value);
     } else {
       console.warn("[vending] skip icon", body.icons[i].trackId, result.reason);
     }
   }
 
-  console.info(`[vending] baked ${textures.length} icon textures @${ICON_TEX_SIZE}px`);
-
-  if (textures[0]?.userData?.canvas) {
-    const sample = textures[0].userData.canvas as HTMLCanvasElement;
-    console.info(
-      `[vending] sample bake dataURL length=${sample.toDataURL("image/png").length}`,
-    );
-  }
+  console.info(`[vending] cached ${textures.length} unique WebP textures @128px`);
 
   return { textures, count: textures.length };
 }
@@ -348,27 +324,18 @@ function openFrontGlass(root: THREE.Object3D): THREE.Material[] {
   return cloned;
 }
 
-function makeBodyMaterial(): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x121214,
-    roughness: 0.55,
-    metalness: 0.15,
-  });
-  mat.userData.ownsClone = true;
-  return mat;
-}
-
-/** Icon only on a dedicated front plane — no bevel smear. */
-function makeIconMaterial(map: THREE.Texture | null): THREE.MeshBasicMaterial {
-  const mat = new THREE.MeshBasicMaterial({
+/** Glossy so neon catches the icon surface. */
+function makeGlossIconMaterial(
+  map: THREE.Texture | null,
+): THREE.MeshPhysicalMaterial {
+  const mat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
     map: map ?? null,
-    transparent: true,
-    alphaTest: 0.08,
-    depthWrite: true,
-    toneMapped: false,
+    roughness: 0.16,
+    metalness: 0.14,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.1,
     side: THREE.FrontSide,
-    fog: false,
   });
   mat.userData.ownsClone = true;
   return mat;
@@ -516,12 +483,8 @@ export function VendingMachineScene() {
     const ownedTextures: THREE.Texture[] = [];
     const ownedGeos: THREE.BufferGeometry[] = [];
 
-    let bodyGeo = makeCardBodyGeometry(BASE_CARD_SIZE);
-    let faceGeo = makeFaceGeometry(BASE_CARD_SIZE);
-    ownedGeos.push(bodyGeo, faceGeo);
-
-    const sharedBodyMat = makeBodyMaterial();
-    ownedMats.push(sharedBodyMat);
+    let cardGeo = makeCardGeometry(BASE_CARD_SIZE);
+    ownedGeos.push(cardGeo);
 
     let modelRoot: THREE.Object3D | null = null;
     let ground: THREE.Mesh | null = null;
@@ -547,12 +510,12 @@ export function VendingMachineScene() {
     ];
 
     const camTune = {
-      x: 0.33,
-      y: 10.17,
-      z: -29.82,
-      tx: 0.1783,
-      ty: -0.4282,
-      tz: -2.2204,
+      x: -20,
+      y: 7.71,
+      z: -25.89,
+      tx: 10,
+      ty: 1.15,
+      tz: -4.01,
       focalLength: FOCAL_LENGTH_MM,
       yaw: 9,
       pitch: -6,
@@ -608,10 +571,10 @@ export function VendingMachineScene() {
       return tex;
     }
 
+    /** One map on the whole mesh — same icon front/back/sides. */
     function assignMap(piece: CardPiece, tex: THREE.Texture | null) {
-      const mat = piece.face.material as THREE.MeshBasicMaterial;
-      mat.map = tex;
-      mat.needsUpdate = true;
+      piece.mat.map = tex;
+      piece.mat.needsUpdate = true;
     }
 
     function applyCardScale(piece: CardPiece, size: number) {
@@ -619,7 +582,7 @@ export function VendingMachineScene() {
       piece.root.scale.set(s, s, 1);
     }
 
-    // Extrude +Z; rotate so icon faces machine front (−Z).
+    // Extrude +Z; rotate so front faces machine front (−Z).
     function faceCamera(piece: CardPiece) {
       piece.root.rotation.set(0, Math.PI, 0);
       piece.root.quaternion.setFromEuler(piece.root.rotation);
@@ -627,21 +590,16 @@ export function VendingMachineScene() {
 
     function makeCardPiece(map: THREE.Texture | null): CardPiece {
       const root = new THREE.Group();
-      const body = new THREE.Mesh(bodyGeo, sharedBodyMat);
-      body.castShadow = true;
-      body.receiveShadow = true;
+      const mat = makeGlossIconMaterial(map);
+      ownedMats.push(mat);
 
-      const iconMat = makeIconMaterial(map);
-      ownedMats.push(iconMat);
+      const mesh = new THREE.Mesh(cardGeo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.renderOrder = 2;
+      root.add(mesh);
 
-      const face = new THREE.Mesh(faceGeo, iconMat);
-      // sit on +Z cap of centered extrude (before Y-180 flip toward camera)
-      face.position.z = CARD_DEPTH * 0.5 + CARD_DEPTH * 0.3 + 0.001;
-      face.renderOrder = 2;
-
-      root.add(body, face);
-
-      return { root, face, body };
+      return { root, mesh, mat };
     }
 
     function layoutCards() {
@@ -736,17 +694,15 @@ export function VendingMachineScene() {
 
       for (let s = 0; s < shelfSeats.length; s += 1) {
         for (let i = 0; i < CARDS_PER_ROW; i += 1) {
-          const frontTex = pickTexture();
-          const backTex = pickTexture(frontTex);
-          const front = makeCardPiece(frontTex);
-          const back = makeCardPiece(backTex);
+          const front = makeCardPiece(pickTexture());
+          const back = makeCardPiece(pickTexture(front.mat.map));
 
           front.root.userData.clickable = true;
           back.root.userData.clickable = false;
           front.root.userData.role = "front";
           back.root.userData.role = "back";
-          front.face.renderOrder = 2;
-          back.face.renderOrder = 1;
+          front.mesh.renderOrder = 2;
+          back.mesh.renderOrder = 1;
 
           root.add(front.root);
           root.add(back.root);
@@ -763,8 +719,8 @@ export function VendingMachineScene() {
 
           front.root.userData.pair = pair;
           back.root.userData.pair = pair;
-          front.face.userData.pair = pair;
-          back.face.userData.pair = pair;
+          front.mesh.userData.pair = pair;
+          back.mesh.userData.pair = pair;
           pairs.push(pair);
         }
       }
@@ -981,10 +937,10 @@ export function VendingMachineScene() {
       gui.domElement.style.zIndex = "40";
 
       const camFolder = gui.addFolder("Camera");
-      camFolder.add(camTune, "x", -20, 20, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "x", -40, 40, 0.01).onChange(applyCameraFromTune);
       camFolder.add(camTune, "y", -20, 20, 0.01).onChange(applyCameraFromTune);
       camFolder.add(camTune, "z", -40, 40, 0.01).onChange(applyCameraFromTune);
-      camFolder.add(camTune, "tx", -10, 10, 0.01).onChange(applyCameraFromTune);
+      camFolder.add(camTune, "tx", -20, 20, 0.01).onChange(applyCameraFromTune);
       camFolder.add(camTune, "ty", -10, 10, 0.01).onChange(applyCameraFromTune);
       camFolder.add(camTune, "tz", -10, 10, 0.01).onChange(applyCameraFromTune);
       camFolder
@@ -1094,8 +1050,8 @@ export function VendingMachineScene() {
     function pickFront(event: PointerEvent): CardPair | null {
       pointerFromEvent(event);
       raycaster.setFromCamera(pointer, camera);
-      const faces = pairs.map((p) => p.front.face);
-      const hits = raycaster.intersectObjects(faces, false);
+      const meshes = pairs.map((p) => p.front.mesh);
+      const hits = raycaster.intersectObjects(meshes, false);
 
       for (const hit of hits) {
         const mesh = hit.object as THREE.Mesh;
@@ -1162,8 +1118,6 @@ export function VendingMachineScene() {
       const { pair } = anim;
       const fallen = pair.front;
       const revealed = pair.back;
-      const revealedMat = revealed.face.material as THREE.MeshBasicMaterial;
-      const keepMap = revealedMat.map ?? null;
 
       // revealed already at frontHome from correct slide — leave it
       fallen.root.position.copy(pair.backHome);
@@ -1177,10 +1131,10 @@ export function VendingMachineScene() {
       fallen.root.userData.role = "back";
       revealed.root.userData.clickable = true;
       fallen.root.userData.clickable = false;
-      revealed.face.renderOrder = 2;
-      fallen.face.renderOrder = 1;
+      revealed.mesh.renderOrder = 2;
+      fallen.mesh.renderOrder = 1;
 
-      assignMap(fallen, pickTexture(keepMap));
+      assignMap(fallen, pickTexture(revealed.mat.map));
 
       pair.busy = false;
     }
