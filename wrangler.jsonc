@@ -1,17 +1,25 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "app-store-indexor",
+  "name": "archies-appstore-lookup",
   "main": "workers/site.ts",
+  "workers_dev": false,
+  "preview_urls": false,
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "routes": [
+    {
+      "pattern": "10k.aauburn.com",
+      "custom_domain": true
+    }
+  ],
   "services": [
     {
       "binding": "WORKER_SELF_REFERENCE",
-      "service": "app-store-indexor"
+      "service": "archies-appstore-lookup"
     }
   ],
   "d1_databases": [
