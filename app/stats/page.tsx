@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-
 import Link from "next/link";
 
 import { HereNow } from "@/components/HereNow";
@@ -13,10 +11,6 @@ import { loadStats } from "@/lib/site/stats";
 import type { CountRow } from "@/lib/site/stats";
 
 export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "Stats",
-};
 
 const RANGES = [7, 30, 90] as const;
 

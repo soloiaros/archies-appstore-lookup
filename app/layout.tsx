@@ -17,10 +17,7 @@ import { cn } from "@/lib/utils";
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: {
-    default: "10K",
-    template: "%s · 10K",
-  },
+  title: "10K: App Research",
 
   description:
     "Look what thousands of competitors do, in spare seconds.",

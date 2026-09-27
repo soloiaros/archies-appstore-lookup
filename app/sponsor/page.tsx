@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-
 import { SectionPage } from "@/components/DirectionalPage";
 
 import { SlotMap } from "@/components/SlotMap";
@@ -11,10 +9,6 @@ import { listSlots } from "@/lib/site/slots";
 import { loadStats } from "@/lib/site/stats";
 
 export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "Sponsor",
-};
 
 const STEPS = [
   {

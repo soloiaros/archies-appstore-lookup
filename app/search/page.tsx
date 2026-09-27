@@ -1,5 +1,3 @@
-import type { Metadata } from "next";
-
 import { SectionPage } from "@/components/DirectionalPage";
 
 import { QueryScreen } from "@/components/QueryScreen";
@@ -13,10 +11,6 @@ import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
 import { fallbackSlots, listSlots } from "@/lib/site/slots";
 
 export const dynamic = "force-dynamic";
-
-export const metadata: Metadata = {
-  title: "Search",
-};
 
 const PILE = 300;
 
