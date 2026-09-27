@@ -6,6 +6,8 @@ import { Presence } from "../lib/site/presence-do";
 
 import { releaseExpired } from "../lib/site/sweep";
 
+export { IconEmbed } from "./icon-embed";
+
 export { Presence };
 
 type FetchHandler = (

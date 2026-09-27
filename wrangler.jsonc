@@ -25,6 +25,15 @@
   "ai": {
     "binding": "AI"
   },
+  "containers": [
+    {
+      "class_name": "IconEmbed",
+      "image": "./container/Dockerfile",
+      "image_build_context": "./container",
+      "max_instances": 1,
+      "instance_type": "standard-1"
+    }
+  ],
   "d1_databases": [
     {
       "binding": "SITE_DB",
@@ -42,6 +51,10 @@
       {
         "name": "PRESENCE",
         "class_name": "Presence"
+      },
+      {
+        "name": "ICON_EMBED",
+        "class_name": "IconEmbed"
       }
     ]
   },
@@ -49,6 +62,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["Presence"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["IconEmbed"]
     }
   ],
   "triggers": {
