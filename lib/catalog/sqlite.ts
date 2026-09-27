@@ -7,8 +7,6 @@ import type {
 
 import { momentumFromCharts } from "@/lib/pipeline/momentum";
 
-import { retrieveFinalists } from "@/lib/retrieve/finalists";
-
 import { openCatalog } from "@/lib/scrape/store";
 
 import type { AppMetadata } from "@/models/app";
@@ -234,6 +232,10 @@ export function sqliteCatalog(
     async finalists(
       query: string,
     ) {
+      const { retrieveFinalists } = await import(
+        "@/lib/retrieve/finalists"
+      );
+
       return retrieveFinalists(
         db,
         query,
