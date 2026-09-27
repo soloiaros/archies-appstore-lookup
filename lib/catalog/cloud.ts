@@ -29,6 +29,8 @@ import type {
   Finalist,
 } from "@/lib/types";
 
+import type { ScoredFinalist } from "@/lib/jev/score";
+
 const APP_COLUMNS = `
   track_id as trackId,
   bundle_id as bundleId,
@@ -319,13 +321,14 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
 export function lexicalDiscovery(
   query: string,
   finalists: Finalist[],
+  scoringNote: string | null = null,
 ): DiscoveryAnswer {
   return {
     shape: "discovery",
     query,
     tier: "unavailable",
     scoring: "unavailable",
-    scoringNote: null,
+    scoringNote,
     finalistCount: finalists.length,
     hits: finalists.map((hit, index) => ({
       trackId: hit.trackId,
@@ -333,6 +336,44 @@ export function lexicalDiscovery(
       iconUrl: hit.iconUrl,
       probability: Math.max(0.15, 1 - index * 0.02),
     })),
+  };
+}
+
+export function scoredDiscovery(
+  query: string,
+  finalists: Finalist[],
+  scores: ScoredFinalist[],
+): DiscoveryAnswer {
+  const byId = new Map(
+    finalists.map((finalist) => [finalist.trackId, finalist]),
+  );
+
+  const hits = scores
+    .filter((score) => score.probability >= 0.3)
+    .sort((left, right) => right.probability - left.probability)
+    .flatMap((score) => {
+      const finalist = byId.get(score.trackId);
+
+      if (!finalist) {
+        return [];
+      }
+
+      return [{
+        trackId: score.trackId,
+        name: finalist.name,
+        iconUrl: finalist.iconUrl,
+        probability: score.probability,
+      }];
+    });
+
+  return {
+    shape: "discovery",
+    query,
+    tier: hits.length ? "estimated" : "unavailable",
+    scoring: "scored",
+    scoringNote: null,
+    finalistCount: finalists.length,
+    hits,
   };
 }
 

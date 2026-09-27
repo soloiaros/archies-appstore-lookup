@@ -1,6 +1,7 @@
 import {
   cloudCatalog,
   lexicalDiscovery,
+  scoredDiscovery,
 } from "@/lib/catalog/cloud";
 
 import { sqliteCatalog } from "@/lib/catalog/sqlite";
@@ -48,7 +49,28 @@ export async function answer(
     if (remote) {
       const found = await catalog.finalists(query);
 
-      return lexicalDiscovery(query, found);
+      const { scoreFinalists } = await import(
+        "@/lib/jev/score"
+      );
+
+      const scored = await scoreFinalists(
+        query,
+        found,
+      );
+
+      if (scored.status === "scored") {
+        return scoredDiscovery(
+          query,
+          found,
+          scored.scores,
+        );
+      }
+
+      return lexicalDiscovery(
+        query,
+        found,
+        scored.reason,
+      );
     }
 
     const { answerDiscovery } = await import(
