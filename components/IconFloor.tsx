@@ -157,13 +157,21 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
 
     // The packed sheet: one request for the whole pile. Anything it does not cover, and anything that arrives later,
     // loads its own image and draws itself into its cell when it lands.
+    let drawable = !sheet;
     if (sheet) {
       const img = loadImage(sheet.url);
+      img.fetchPriority = "high";
+      img.decoding = "async";
       scene.sheetImg = img;
-      if (img.complete && img.naturalWidth) rebake();
-      else img.onload = () => rebake();
+      const ready = () => {
+        drawable = true;
+        rebake();
+      };
+      if (img.complete && img.naturalWidth) ready();
+      else img.onload = ready;
       img.onerror = () => {
         scene.sheet = null; // no sheet: fall back to one image each, which is slower but still works
+        drawable = true;
         for (let i = 0; i < srcs.length; i++) if (typeof scene.tiles[i] === "number") loadOwn(i);
       };
     }
@@ -283,7 +291,7 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
     let frames = 0;
     let last = performance.now();
     let acc = 0;
-    let dropAt = performance.now() + 200;
+    let dropAt = performance.now();
     let lastShake = 0;
 
     if (reduced) {
@@ -421,10 +429,12 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       scene.now = now;
       if (!reduced) {
         swaps.churn(now);
-        // A small library trickles in one by one; a large one pours, so the whole pile is down in about 4 seconds.
+        // Hold the pour until the sheet is painted, then drop the whole pile on that frame.
+        // Otherwise the bodies settle while they are invisible and pop in already stacked.
         const gap = Math.min(50, 4000 / Math.max(1, bodies.length));
+        const cap = drawable ? bodies.length : 0;
         let poured = 0;
-        while (scene.added < bodies.length && now >= dropAt && poured < 12) {
+        while (scene.added < bodies.length && drawable && now >= dropAt && poured < cap) {
           Matter.Composite.add(engine.world, bodies[scene.added++]);
           dropAt = Math.max(dropAt + gap, now - 100);
           poured++;

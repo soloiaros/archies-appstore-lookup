@@ -67,6 +67,12 @@ export default async function SearchPage() {
 
   return (
     <SectionPage>
+      <link
+        rel="preload"
+        as="image"
+        href="/atlas/pile.webp"
+        fetchPriority="high"
+      />
       <div className="search-lock">
         <QueryScreen
           icons={shown}
