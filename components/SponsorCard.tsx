@@ -1,88 +1,259 @@
 "use client";
 
-import Link from "next/link";
+import type { CSSProperties, ReactNode } from "react";
 
 import { inkOn, muteOn } from "@/lib/site/color";
+
+import { openSponsor } from "@/lib/site/open";
 
 import { playButtonSound } from "@/lib/sounds";
 
 import type { SlotView } from "@/lib/site/types";
 
-export function SponsorCard({
-  slot,
-  priceLabel,
+type Size = "tile" | "pill";
+
+export type FaceData = {
+  name: string;
+
+  blurb: string | null;
+
+  logoUrl: string | null;
+
+  color: string | null;
+};
+
+export function LiveFace({
+  data,
+  size,
+  href,
+  inert,
 }: {
-  slot: SlotView;
+  data: FaceData;
 
-  priceLabel: string;
+  size: Size;
+
+  href?: string;
+
+  inert?: boolean;
 }) {
-  const live = slot.status !== "open"
-    && slot.status !== "held"
-    && slot.name
-    && slot.url;
+  const background = data.color ?? "#1a1a1c";
 
-  if (live && slot.url && slot.name) {
-    const background = slot.color ?? "#1a1a1c";
+  const style: CSSProperties = {
+    background,
+    color: inkOn(background),
+  };
 
-    return (
-      <a
-        className="sponsor-card sponsor-card-live"
-        href={slot.url}
-        target="_blank"
-        rel="sponsored noopener"
-        title={`${slot.name} (sponsored)`}
-        style={{
-          background,
-          color: inkOn(background),
-        }}
-        onClick={() => playButtonSound()}
-      >
-        {slot.logoUrl ? (
-          <img
-            src={slot.logoUrl}
-            alt=""
-            width={36}
-            height={36}
-          />
-        ) : null}
+  const body: ReactNode = (
+    <>
+      {data.logoUrl ? (
+        <img
+          src={data.logoUrl}
+          alt=""
+          width={size === "tile" ? 36 : 24}
+          height={size === "tile" ? 36 : 24}
+        />
+      ) : (
+        <span className="sponsor-mark" aria-hidden>
+          {data.name.slice(0, 1).toUpperCase() || "?"}
+        </span>
+      )}
 
-        <strong>{slot.name}</strong>
+      <span className="sponsor-copy">
+        <strong>{data.name}</strong>
 
-        {slot.blurb ? (
+        {data.blurb ? (
           <span style={{ color: muteOn(background) }}>
-            {slot.blurb}
+            {data.blurb}
           </span>
         ) : null}
-      </a>
-    );
-  }
+      </span>
+    </>
+  );
 
-  if (slot.status === "held") {
+  if (!href) {
     return (
-      <div className="sponsor-card sponsor-card-open">
-        <span className="sponsor-kicker">Held</span>
-
-        <strong>In checkout</strong>
-
-        <span>This spot is reserved for a few minutes.</span>
+      <div
+        className={`sponsor-face sponsor-live sponsor-${size}`}
+        style={style}
+      >
+        {body}
       </div>
     );
   }
 
   return (
-    <Link
-      className="sponsor-card sponsor-card-open"
-      href={`/sponsor?slot=${slot.id}#take`}
+    <a
+      className={`sponsor-face sponsor-live sponsor-${size}`}
+      href={href}
+      target="_blank"
+      rel="sponsored noopener"
+      title={`${data.name} (sponsored)`}
+      tabIndex={inert ? -1 : undefined}
+      style={style}
       onClick={() => playButtonSound()}
     >
-      <span className="sponsor-kicker">Open slot</span>
+      {body}
+    </a>
+  );
+}
+
+function OpenFace({
+  slotId,
+  size,
+  priceLabel,
+  inert,
+  alt,
+}: {
+  slotId: number | null;
+
+  size: Size;
+
+  priceLabel: string;
+
+  inert?: boolean;
+
+  alt?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`sponsor-face sponsor-open sponsor-${size}`}
+      tabIndex={inert ? -1 : undefined}
+      aria-label={`Open ad slot, ${priceLabel} for 30 days`}
+      onClick={() => {
+        playButtonSound();
+        openSponsor(slotId);
+      }}
+    >
+      <span className="sponsor-kicker">
+        {alt ? "Your app here" : "Open slot"}
+      </span>
 
       <strong>
         {priceLabel}
-        <span> / 30 days</span>
+        <span>/30 days</span>
       </strong>
 
-      <span>put your product here →</span>
-    </Link>
+      <span className="sponsor-cta">
+        {alt ? "seen by devs on Search →" : "put your product here →"}
+      </span>
+    </button>
+  );
+}
+
+function HeldFace({ size }: { size: Size }) {
+  return (
+    <div className={`sponsor-face sponsor-open sponsor-held sponsor-${size}`}>
+      <span className="sponsor-kicker">Reserved</span>
+
+      <strong>Awaiting payment</strong>
+
+      <span className="sponsor-cta">opens again if unpaid</span>
+    </div>
+  );
+}
+
+function Front({
+  slot,
+  size,
+  priceLabel,
+  inert,
+}: {
+  slot: SlotView;
+
+  size: Size;
+
+  priceLabel: string;
+
+  inert: boolean;
+}) {
+  if (slot.status === "taken" && slot.name && slot.url) {
+    return (
+      <LiveFace
+        data={{
+          name: slot.name,
+          blurb: slot.blurb,
+          logoUrl: slot.logoUrl,
+          color: slot.color,
+        }}
+        size={size}
+        href={slot.url}
+        inert={inert}
+      />
+    );
+  }
+
+  if (slot.status === "held") {
+    return <HeldFace size={size} />;
+  }
+
+  return (
+    <OpenFace
+      slotId={slot.id}
+      size={size}
+      priceLabel={priceLabel}
+      inert={inert}
+    />
+  );
+}
+
+export function SponsorFlip({
+  slot,
+  priceLabel,
+  size,
+  turn,
+  delay,
+}: {
+  slot: SlotView;
+
+  priceLabel: string;
+
+  size: Size;
+
+  turn: number;
+
+  delay: number;
+}) {
+  const backUp = turn % 2 === 1;
+
+  const open = slot.status === "open";
+
+  return (
+    <div className={`sponsor-flip sponsor-flip-${size}`}>
+      <div
+        className="sponsor-flip-card"
+        style={{
+          transform: `rotateY(${turn * 180}deg)`,
+          transitionDelay: `${delay}ms`,
+        }}
+      >
+        <div
+          className="sponsor-flip-face"
+          aria-hidden={backUp}
+          inert={backUp}
+        >
+          <Front
+            slot={slot}
+            size={size}
+            priceLabel={priceLabel}
+            inert={backUp}
+          />
+        </div>
+
+        <div
+          className="sponsor-flip-face sponsor-flip-back"
+          aria-hidden={!backUp}
+          inert={!backUp}
+        >
+          <OpenFace
+            slotId={open ? slot.id : null}
+            size={size}
+            priceLabel={priceLabel}
+            inert={!backUp}
+            alt={open}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

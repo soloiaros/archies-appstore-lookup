@@ -6,9 +6,11 @@ import Link from "next/link";
 
 import { usePathname } from "next/navigation";
 
+import { PageBeacon } from "@/components/PageBeacon";
+
 import { Key } from "@/components/ui/Key";
 
-import { VisitorPill } from "@/components/VisitorPill";
+import { GITHUB_REPO } from "@/lib/links";
 
 import { playButtonSound } from "@/lib/sounds";
 
@@ -21,6 +23,9 @@ const NAV = [
     href: "/how-to-use",
     label: "How to use",
   },
+] as const;
+
+const SIDE = [
   {
     href: "/stats",
     label: "Stats",
@@ -30,6 +35,10 @@ const NAV = [
     label: "Sponsor",
   },
 ] as const;
+
+function isCurrent(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -136,30 +145,62 @@ export function SiteHeader() {
               className="site-nav"
               aria-label="Primary"
             >
-              {NAV.map((item) => {
-                const current =
-                  pathname === item.href
-                  || pathname.startsWith(`${item.href}/`);
-
-                return (
-                  <Key
-                    key={item.href}
-                    href={item.href}
-                    current={current}
-                    onClick={() => playButtonSound()}
-                  >
-                    {item.label}
-                  </Key>
-                );
-              })}
+              {NAV.map((item) => (
+                <Key
+                  key={item.href}
+                  href={item.href}
+                  current={isCurrent(pathname, item.href)}
+                  onClick={() => playButtonSound()}
+                >
+                  {item.label}
+                </Key>
+              ))}
             </nav>
           </div>
 
           <div className="site-header-end">
-            <VisitorPill />
+            <nav
+              className="site-nav"
+              aria-label="Site"
+            >
+              {SIDE.map((item) => (
+                <Key
+                  key={item.href}
+                  href={item.href}
+                  current={isCurrent(pathname, item.href)}
+                  onClick={() => playButtonSound()}
+                >
+                  {item.label}
+                </Key>
+              ))}
+            </nav>
+
+            <a
+              className="ui-key star-key"
+              href={GITHUB_REPO}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Star 10K on GitHub"
+              title="Star on GitHub"
+              onClick={() => playButtonSound()}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width="15"
+                height="15"
+                aria-hidden
+              >
+                <path
+                  d="M12 2.8l2.84 5.76 6.36.92-4.6 4.49 1.09 6.33L12 17.3l-5.69 3 1.09-6.33-4.6-4.49 6.36-.92z"
+                  fill="currentColor"
+                />
+              </svg>
+            </a>
           </div>
         </div>
       </header>
+
+      <PageBeacon />
 
       <div
         className="header-blur"

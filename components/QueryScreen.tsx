@@ -29,6 +29,8 @@ import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import { NoticeSurface } from "@/components/NoticeSurface";
 
+import { LiveStats } from "@/components/LiveStats";
+
 import { SearchComposer } from "@/components/SearchComposer";
 
 import { SponsorRails } from "@/components/SponsorRails";
@@ -436,6 +438,15 @@ export function QueryScreen({
             }
           : null;
 
+  const answerShown =
+    state.phase === "done"
+    && (
+      (route === "factual" && state.answer.shape === "factual")
+      || (route === "comparative" && state.answer.shape === "comparative")
+    );
+
+  const outputShown = Boolean(notice) || answerShown;
+
   return (
     <>
       <IconFloor
@@ -462,6 +473,14 @@ export function QueryScreen({
               ref={bar}
               className="stage-bar"
             >
+              {outputShown ? null : (
+                <div className="stage-head">
+                  <h1>Describe an app</h1>
+
+                  <LiveStats />
+                </div>
+              )}
+
               <SearchComposer
                 value={text}
                 onChange={onType}
@@ -538,13 +557,13 @@ export function QueryScreen({
               </div>
             ) : null}
           </main>
-
-          <SponsorRails
-            slots={slots}
-            priceLabel={priceLabel}
-          />
         </SearchPage>
       )}
+
+      <SponsorRails
+        slots={slots}
+        priceLabel={priceLabel}
+      />
     </>
   );
 }

@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-const GITHUB_REPO =
-  "https://github.com/soloiaros/archies-appstore-lookup";
+import { GITHUB_REPO } from "@/lib/links";
 
 const GITHUB_AUTHOR = "https://github.com/soloiaros";
 
