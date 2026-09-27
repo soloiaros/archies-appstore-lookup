@@ -8,6 +8,10 @@ import { pileAtlas } from "@/lib/atlas";
 
 import { pileScene } from "@/lib/catalog/pile";
 
+import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
+
+import { fallbackSlots, listSlots } from "@/lib/site/slots";
+
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -26,7 +30,7 @@ const shuffle = <T,>(list: T[]) => {
   return list;
 };
 
-export default function SearchPage() {
+export default async function SearchPage() {
   const scene = pileScene(PILE);
 
   const atlas = pileAtlas();
@@ -49,12 +53,16 @@ export default function SearchPage() {
 
   const shown = packed.slice(0, PILE);
 
+  const slots = await listSlots().catch(() => fallbackSlots());
+
   return (
     <SectionPage>
       <div className="search-lock">
         <QueryScreen
           icons={shown}
           indexed={scene.indexed}
+          slots={slots}
+          priceLabel={formatPrice(sponsorPriceCents())}
           sheet={
             atlas
               ? {
