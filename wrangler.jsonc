@@ -27,6 +27,11 @@
       "binding": "SITE_DB",
       "database_name": "site",
       "database_id": "245cac40-60d4-4831-8b0c-8f901de94ae2"
+    },
+    {
+      "binding": "CATALOG_DB",
+      "database_name": "catalog",
+      "database_id": "44635e0b-2a36-4bbc-889b-1b2a5028895f"
     }
   ],
   "durable_objects": {
