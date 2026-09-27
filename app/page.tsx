@@ -2,6 +2,8 @@ import { HomeFaq } from "@/components/HomeFaq";
 
 import { HomeFooter } from "@/components/HomeFooter";
 
+import { HeroMorph } from "@/components/HeroMorph";
+
 import { HomeHeroActions } from "@/components/HomeHeroActions";
 
 import { SectionPage } from "@/components/DirectionalPage";
@@ -20,13 +22,13 @@ const STEPS = [
   },
   {
     n: "2",
-    title: "Read the result",
-    body: "A description keeps icons scored at 30% or higher, with that percentage beside each one. A name returns one app. Words such as vs, compare, faster, or growing return a list ordered by stored momentum.",
+    title: "Get the apps",
+    body: "10K shows all apps that matched your description.",
   },
   {
     n: "3",
-    title: "Open a match",
-    body: "Click an icon for the app. Every field is verified, estimated, or unavailable, and a missing number stays unavailable.",
+    title: "Look into it",
+    body: "Click an app. The indexer keeps relevant scores on app's revenue estimate and other features. Find what your competitors excel at.",
   },
 ] as const;
 
@@ -46,13 +48,7 @@ export default function HomePage() {
       <main className="home">
         <section className="home-hero" aria-label="10K">
           <div className="page-rail home-hero-inner">
-            <img
-              className="home-hero-anim"
-              src="/branding/inbetween-morphing.svg"
-              alt=""
-              decoding="async"
-              draggable={false}
-            />
+            <HeroMorph />
 
             {indexed > 0 ? (
               <p className="home-hero-badge">
@@ -66,12 +62,12 @@ export default function HomePage() {
             ) : null}
 
             <h1 className="home-hero-title">
-              Find App Store apps by what they do
+              Jev-powered AppStore indexing for devs.
             </h1>
 
             <p className="home-hero-lede">
-              Describe an app, name one, or compare a few.
-              Every field shows what is actually known.
+              Describe an app, get all matching AppStore listings in seconds,
+              with stats on revenue and distinctive features.
             </p>
 
             <HomeHeroActions />

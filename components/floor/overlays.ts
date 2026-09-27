@@ -258,6 +258,7 @@ export function createOverlays(
         const home = hold.parked || (hold.arrived && Math.abs(body.position.x - hold.rest.x) < 8 && Math.abs(body.position.y - (hold.rest.y - scene.scroll)) < 8);
         if (!home) return;
         hold.labelled = true;
+        scene.seatRev++;
         label.shown = true;
         const el = els.labels()[hold.label];
         if (el) el.style.opacity = "1";

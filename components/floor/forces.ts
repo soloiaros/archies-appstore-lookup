@@ -52,9 +52,9 @@ export function applyHoldForces(scene: Scene, dt: number) {
     // If the pile has it pinned (far from the rest point but barely moving), lean harder until it breaks free.
     const far = Math.abs(restY - body.position.y) > 40;
     hold.boost = far && Matter.Body.getSpeed(body) < 3 ? Math.min(6, hold.boost + 0.12 * part) : Math.max(1, hold.boost - 0.15 * part);
-    if (hold.boost > 1.2) wakeNear(scene, body);
-    // It collides all the way up. Once it has arrived it stops, so that pile icons it carried up on its back
-    // fall off instead of sitting on it, and so that the row of matches cannot jostle itself out of line.
+    // A match on the way to its cell does not touch the pile, so waking neighbors here only churns them.
+    if (hold.boost > 1.2 && body.collisionFilter.mask !== 0) wakeNear(scene, body);
+    // Collision stays off for the whole rise. Arriving clears it again.
     // "Arrived" is generous on purpose: within most of its own size of the slot, or 3 s after setting off at the latest.
     // With a tight test, pile icons wedged against a match kept it just short of its slot, and so kept riding on it.
     const near = Math.max(26, size * hold.scale * 0.8);
@@ -99,6 +99,7 @@ export function park(scene: Scene, i: number) {
   hold.parked = true;
   hold.arrived = true;
   body.collisionFilter.mask = 0;
+  scene.seatRev++;
   scene.dirty = true;
 }
 

@@ -73,8 +73,12 @@ export function createMatches(scene: Scene, overlays: ReturnType<typeof createOv
     const label = overlays.assign(i, rank, match, rest, shown.layout.small);
     holds.set(i, { rest, scale: rest.side / scene.size, startY: bodies[i].position.y, t: 0, boost: 1, rank, label, arrived: false, match, labelled: false, parked: false });
     if (!grown.has(i)) grown.set(i, 1);
-    // Matches still shoulder the pile aside, but never each other: two that had to cross once blocked each other in mid-air.
+    // Through the pile: no contacts with neighbors, so a match cannot wedge or drag the pile with it.
     bodies[i].collisionFilter.group = -1;
+    bodies[i].collisionFilter.mask = 0;
+    // #region agent log
+    if (rank < 6) fetch('http://127.0.0.1:7688/ingest/905fb9fa-cacf-4fc7-a090-bb922ff403b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e3b38f'},body:JSON.stringify({sessionId:'e3b38f',runId:'post-fix',hypothesisId:'A',location:'matches.ts:begin',message:'match launch collision filter',data:{rank,fly,group:bodies[i].collisionFilter.group,mask:bodies[i].collisionFilter.mask,category:bodies[i].collisionFilter.category},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     makeSharp(i, rest.side);
     wakeNear(scene, bodies[i]); // either way it is about to leave this spot, so what was resting on it has to fall
     if (!fly) {
@@ -146,6 +150,7 @@ export function createMatches(scene: Scene, overlays: ReturnType<typeof createOv
       Matter.Sleeping.set(body, true);
       overlays.fade(hold.label);
       holds.delete(i);
+      scene.seatRev++;
       shown.launched.delete(hold.rank);
       shown.taken.delete(i);
       if (typeof scene.tiles[i] === "number") scene.images[i] = null; // the sheet still has its pile-sized copy, so let the big one go
@@ -274,6 +279,7 @@ export function createMatches(scene: Scene, overlays: ReturnType<typeof createOv
       overlays.fade(hold.label);
     });
     holds.clear(); // the springs stop, so gravity alone carries them back down, shrinking as they go
+    scene.seatRev++;
     scene.dirty = true;
   };
 
@@ -384,6 +390,7 @@ export function createMatches(scene: Scene, overlays: ReturnType<typeof createOv
         makeSharp(i, hold.rest.side);
         overlays.move(hold.label, hold.rest);
       });
+      scene.seatRev++;
       retire();
       fill(false);
     },

@@ -49,6 +49,7 @@ export type Scene = {
   midSize: number; // the other matches
   dpr: number;
   added: number; // how many bodies have been poured into the world so far
+  seatRev: number; // bumps when a result seat appears, moves, or leaves
   dirty: boolean; // only repaint when something actually moved
   now: number; // the current frame's clock
   retile: (i: number) => void; // draw body i's cell of the atlas again, from whatever its picture is now
