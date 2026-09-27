@@ -51,6 +51,9 @@
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
+  "vars": {
+    "SPONSOR_PRICE_CENTS": "40000"
+  },
   "observability": {
     "logs": {
       "enabled": true,
