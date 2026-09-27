@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { openCatalog } from "@/lib/scrape/store";
 
+import { catalogDb } from "@/lib/site/db";
+
 export const runtime = "nodejs";
 
 export async function GET(
@@ -17,6 +19,26 @@ export async function GET(
       || 16,
     ),
   );
+
+  const remote = await catalogDb();
+
+  if (remote) {
+    const rows = await remote.all<{ src: string }>(
+      `
+      select icon_url as src
+      from apps
+      where icon_url != ''
+        and delisted = 0
+      order by random()
+      limit ?
+      `,
+      [sample],
+    );
+
+    return NextResponse.json({
+      srcs: rows.map((row) => String(row.src)),
+    });
+  }
 
   const db = openCatalog();
 

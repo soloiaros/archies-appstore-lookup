@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { openCatalog } from "@/lib/scrape/store";
 
+import { catalogDb } from "@/lib/site/db";
+
 export const runtime = "nodejs";
 
 const DEFAULT_LIMIT = 50;
@@ -22,6 +24,38 @@ export async function GET(request: Request) {
       Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT) || DEFAULT_LIMIT,
     ),
   );
+
+  const remote = await catalogDb();
+
+  if (remote) {
+    const rows = await remote.all<{
+      trackId: number;
+      name: string;
+    }>(
+      `
+      select
+        track_id as trackId,
+        name
+      from apps
+      where delisted = 0
+        and icon_url != ''
+      order by track_id
+      limit ?
+      `,
+      [limit],
+    );
+
+    const icons = rows.map((row) => ({
+      trackId: Number(row.trackId),
+      name: String(row.name),
+      src: `/api/vending-icons/${row.trackId}`,
+    }));
+
+    return NextResponse.json({
+      count: icons.length,
+      icons,
+    });
+  }
 
   const db = openCatalog();
 

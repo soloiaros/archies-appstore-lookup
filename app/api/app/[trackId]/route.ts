@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { loadCloudDetail } from "@/lib/catalog/cloud";
+
 import { loadAppDetail } from "@/lib/catalog/detail";
+
+import { catalogDb } from "@/lib/site/db";
 
 export const runtime = "nodejs";
 
@@ -37,12 +41,15 @@ export async function GET(
       ? null
       : Number(probabilityRaw);
 
-  const detail = loadAppDetail(
-    trackId,
-    Number.isFinite(matchProbability)
-      ? matchProbability
-      : null,
-  );
+  const remote = await catalogDb();
+
+  const probability = Number.isFinite(matchProbability)
+    ? matchProbability
+    : null;
+
+  const detail = remote
+    ? await loadCloudDetail(remote, trackId, probability)
+    : loadAppDetail(trackId, probability);
 
   if (!detail) {
     return NextResponse.json(

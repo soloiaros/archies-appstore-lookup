@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import sharp from "sharp";
-
 import { openCatalog } from "@/lib/scrape/store";
+
+import { catalogDb } from "@/lib/site/db";
 
 export const runtime = "nodejs";
 
@@ -25,27 +25,45 @@ export async function GET(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "bad trackId" }, { status: 400 });
   }
 
-  const db = openCatalog();
+  const remote = await catalogDb();
 
   let iconUrl = "";
 
-  try {
-    const row = db
-      .prepare(
-        `
-        select icon_url as iconUrl
-        from apps
-        where track_id = ?
-          and delisted = 0
-          and icon_url != ''
-        limit 1
+  if (remote) {
+    const row = await remote.get<{ iconUrl: string }>(
+      `
+      select icon_url as iconUrl
+      from apps
+      where track_id = ?
+        and delisted = 0
+        and icon_url != ''
+      limit 1
       `,
-      )
-      .get(trackId) as { iconUrl: string } | undefined;
+      [trackId],
+    );
 
     iconUrl = row ? String(row.iconUrl) : "";
-  } finally {
-    db.close();
+  } else {
+    const db = openCatalog();
+
+    try {
+      const row = db
+        .prepare(
+          `
+          select icon_url as iconUrl
+          from apps
+          where track_id = ?
+            and delisted = 0
+            and icon_url != ''
+          limit 1
+        `,
+        )
+        .get(trackId) as { iconUrl: string } | undefined;
+
+      iconUrl = row ? String(row.iconUrl) : "";
+    } finally {
+      db.close();
+    }
   }
 
   if (!iconUrl) {
@@ -73,6 +91,21 @@ export async function GET(_request: Request, { params }: Params) {
     }
 
     const input = Buffer.from(await upstream.arrayBuffer());
+
+    const type = upstream.headers.get("content-type")
+      ?? "image/png";
+
+    if (remote) {
+      return new NextResponse(new Uint8Array(input), {
+        status: 200,
+        headers: {
+          "Content-Type": type,
+          "Cache-Control": "public, max-age=86400, immutable",
+        },
+      });
+    }
+
+    const sharp = (await import("sharp")).default;
 
     const webp = await sharp(input)
       .resize(SIZE, SIZE, { fit: "cover" })
