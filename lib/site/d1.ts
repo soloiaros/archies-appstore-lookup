@@ -56,11 +56,11 @@ export async function ensureSchema(
 
   const statements = SCHEMA
     .split(";")
-    .map((statement) => statement.trim())
+    .map((statement) => statement.replace(/\s+/g, " ").trim())
     .filter(Boolean);
 
   for (const statement of statements) {
-    await sql.exec(`${statement};`);
+    await sql.exec(statement);
   }
 
   ready.add(token);
