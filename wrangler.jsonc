@@ -22,6 +22,9 @@
       "service": "archies-appstore-lookup"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
   "d1_databases": [
     {
       "binding": "SITE_DB",
