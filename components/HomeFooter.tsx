@@ -5,7 +5,7 @@ const GITHUB_REPO =
 
 const GITHUB_AUTHOR = "https://github.com/soloiaros";
 
-const ARCHIE_URL = "https://github.com/archieauburn";
+const ARCHIE_URL = "https://github.com/soloiaros";
 
 const INSTAGRAM_URL = "https://www.instagram.com/archieauburn/";
 
