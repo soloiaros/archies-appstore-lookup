@@ -445,7 +445,14 @@ export function QueryScreen({
       || (route === "comparative" && state.answer.shape === "comparative")
     );
 
-  const outputShown = Boolean(notice) || answerShown;
+  const discoveryShown =
+    state.phase === "done"
+    && state.answer.shape === "discovery"
+    && matches.length > 0
+    && text.trim() === state.answer.query;
+
+  const outputShown =
+    Boolean(notice) || answerShown || discoveryShown;
 
   return (
     <>
