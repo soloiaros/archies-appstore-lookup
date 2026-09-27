@@ -6,6 +6,10 @@ import { GeistSans } from "geist/font/sans";
 
 import { SiteHeader } from "@/components/SiteHeader";
 
+import { SponsorModal } from "@/components/SponsorModal";
+
+import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
+
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -39,6 +43,8 @@ export default function RootLayout({
         <SiteHeader />
 
         {children}
+
+        <SponsorModal priceLabel={formatPrice(sponsorPriceCents())} />
       </body>
     </html>
   );
