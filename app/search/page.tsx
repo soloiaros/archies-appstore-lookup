@@ -4,8 +4,6 @@ import { QueryScreen } from "@/components/QueryScreen";
 
 import { pileAtlas } from "@/lib/atlas";
 
-import { pileScene } from "@/lib/catalog/pile";
-
 import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
 
 import { fallbackSlots, listSlots } from "@/lib/site/slots";
@@ -25,27 +23,45 @@ const shuffle = <T,>(list: T[]) => {
 };
 
 export default async function SearchPage() {
-  const scene = pileScene(PILE);
-
   const atlas = pileAtlas();
 
-  const packed = atlas
-    ? shuffle(
-      atlas.srcs.map((src, at) => ({
-        id: atlas.ids[at],
-        src,
-        at,
-      })),
-    )
-    : shuffle(
-      scene.icons.map((icon) => ({
+  let indexed = atlas?.ids.length ?? 0;
+
+  let loose: Array<{
+    id: string;
+
+    src: string;
+
+    at: number;
+  }> = [];
+
+  if (atlas) {
+    loose = atlas.srcs.map((src, at) => ({
+      id: atlas.ids[at] ?? String(at),
+      src,
+      at,
+    }));
+  } else {
+    try {
+      const { pileScene } = await import(
+        "@/lib/catalog/pile"
+      );
+
+      const scene = pileScene(PILE);
+
+      indexed = scene.indexed;
+
+      loose = scene.icons.map((icon) => ({
         id: String(icon.trackId),
         src: icon.iconUrl,
         at: -1,
-      })),
-    );
+      }));
+    } catch {
+      loose = [];
+    }
+  }
 
-  const shown = packed.slice(0, PILE);
+  const shown = shuffle(loose).slice(0, PILE);
 
   const slots = await listSlots().catch(() => fallbackSlots());
 
@@ -54,7 +70,7 @@ export default async function SearchPage() {
       <div className="search-lock">
         <QueryScreen
           icons={shown}
-          indexed={scene.indexed}
+          indexed={indexed}
           slots={slots}
           priceLabel={formatPrice(sponsorPriceCents())}
           sheet={
