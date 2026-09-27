@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { BlockList, isIP } from "node:net";
 
 const LIMIT = 500_000;
 
@@ -72,87 +72,180 @@ function iconHref(html: string) {
   return null;
 }
 
-function isPrivate(ip: string) {
-  const lower = ip.toLowerCase();
+const blocked = new BlockList();
 
-  if (lower.includes(":")) {
-    return lower === "::1"
-      || lower.startsWith("fc")
-      || lower.startsWith("fd")
-      || lower.startsWith("fe80");
-  }
-
-  const parts = ip.split(".").map((part) => Number(part));
-
-  if (
-    parts.length !== 4
-    || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
-  ) {
-    return true;
-  }
-
-  const [a, b] = parts;
-
-  if (a === 10 || a === 127 || a === 0) {
-    return true;
-  }
-
-  if (a === 169 && b === 254) {
-    return true;
-  }
-
-  if (a === 172 && b >= 16 && b <= 31) {
-    return true;
-  }
-
-  if (a === 192 && b === 168) {
-    return true;
-  }
-
-  if (a === 100 && b >= 64 && b <= 127) {
-    return true;
-  }
-
-  return false;
+for (const [address, prefix] of [
+  ["0.0.0.0", 8],
+  ["10.0.0.0", 8],
+  ["100.64.0.0", 10],
+  ["127.0.0.0", 8],
+  ["169.254.0.0", 16],
+  ["172.16.0.0", 12],
+  ["192.0.0.0", 24],
+  ["192.0.2.0", 24],
+  ["192.88.99.0", 24],
+  ["192.168.0.0", 16],
+  ["198.18.0.0", 15],
+  ["198.51.100.0", 24],
+  ["203.0.113.0", 24],
+  ["224.0.0.0", 4],
+  ["240.0.0.0", 4],
+] as const) {
+  blocked.addSubnet(address, prefix, "ipv4");
 }
 
-async function assertPublic(url: URL) {
-  const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+blocked.addAddress("::", "ipv6");
 
+blocked.addAddress("::1", "ipv6");
+
+blocked.addSubnet("64:ff9b::", 96, "ipv6");
+
+blocked.addSubnet("2001:db8::", 32, "ipv6");
+
+blocked.addSubnet("fc00::", 7, "ipv6");
+
+blocked.addSubnet("fe80::", 10, "ipv6");
+
+blocked.addSubnet("ff00::", 8, "ipv6");
+
+type Pin = {
+  address: string;
+
+  family: 4 | 6;
+};
+
+function blockedName(host: string) {
   if (
     !host
     || host === "localhost"
     || host.endsWith(".localhost")
     || host.endsWith(".local")
+    || host.endsWith(".internal")
+    || host.endsWith(".home.arpa")
+    || host.endsWith(".lan")
   ) {
+    return true;
+  }
+
+  if (isIP(host)) {
+    return false;
+  }
+
+  if (/^0x[0-9a-f.]+$/i.test(host) || /^\d+$/.test(host)) {
+    return true;
+  }
+
+  const parts = host.split(".");
+
+  if (
+    parts.length !== 4
+    && parts.every((part) => /^\d+$/.test(part))
+  ) {
+    return true;
+  }
+
+  return parts.some((part) => /^0\d/.test(part));
+}
+
+function assertAddress(ip: string) {
+  const kind = isIP(ip);
+
+  if (kind !== 4 && kind !== 6) {
     throw new Error("That host is not public.");
   }
 
-  if (isIP(host) && isPrivate(host)) {
+  const type = kind === 6 ? "ipv6" : "ipv4";
+
+  if (blocked.check(ip, type)) {
+    throw new Error("That host is not public.");
+  }
+}
+
+async function resolvePublic(url: URL): Promise<Pin> {
+  const host = url.hostname
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "")
+    .toLowerCase();
+
+  if (blockedName(host)) {
     throw new Error("That host is not public.");
   }
 
   if (isIP(host)) {
-    return;
+    assertAddress(host);
+
+    return {
+      address: host,
+      family: isIP(host) === 6 ? 6 : 4,
+    };
   }
 
+  const { lookup } = await import("node:dns/promises");
+
+  let records: Array<{ address: string; family: number }>;
+
   try {
-    const { lookup } = await import("node:dns/promises");
+    records = await lookup(host, { all: true, verbatim: true });
+  } catch {
+    throw new Error("That host is not public.");
+  }
 
-    const records = await lookup(host, { all: true });
+  if (records.length === 0) {
+    throw new Error("That host is not public.");
+  }
 
-    for (const record of records) {
-      if (isPrivate(record.address)) {
-        throw new Error("That host is not public.");
-      }
-    }
-  } catch (error) {
-    if (
-      error instanceof Error
-      && error.message === "That host is not public."
-    ) {
-      throw error;
-    }
+  for (const record of records) {
+    assertAddress(record.address);
+  }
+
+  return {
+    address: records[0].address,
+    family: records[0].family === 6 ? 6 : 4,
+  };
+}
+
+function onWorkers() {
+  return typeof navigator !== "undefined"
+    && navigator.userAgent === "Cloudflare-Workers";
+}
+
+async function loadPage(url: URL, pin: Pin) {
+  const init = {
+    redirect: "manual" as const,
+    signal: AbortSignal.timeout(8000),
+    headers: {
+      accept: "text/html",
+      "user-agent": "10K sponsor preview",
+    },
+  };
+
+  if (onWorkers()) {
+    return fetch(url, init);
+  }
+
+  const undici = await import("undici");
+
+  const agent = new undici.Agent({
+    connect: {
+      lookup(_hostname, options, callback) {
+        if (options.all) {
+          callback(null, [{ address: pin.address, family: pin.family }]);
+
+          return;
+        }
+
+        callback(null, pin.address, pin.family);
+      },
+    },
+  });
+
+  try {
+    return await undici.fetch(url, {
+      ...init,
+      dispatcher: agent,
+    }) as unknown as Response;
+  } finally {
+    await agent.close();
   }
 }
 
@@ -258,16 +351,9 @@ export async function readPreview(raw: string): Promise<Preview> {
   let current = httpsUrl(raw);
 
   for (let hop = 0; hop < 4; hop += 1) {
-    await assertPublic(current);
+    const pin = await resolvePublic(current);
 
-    const response = await fetch(current, {
-      redirect: "manual",
-      signal: AbortSignal.timeout(8000),
-      headers: {
-        accept: "text/html",
-        "user-agent": "10K sponsor preview",
-      },
-    });
+    const response = await loadPage(current, pin);
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");

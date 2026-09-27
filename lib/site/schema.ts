@@ -25,6 +25,16 @@ create table if not exists pageviews (
 
 create index if not exists pageviews_ts on pageviews (ts);
 
+create table if not exists rate_limits (
+  bucket text not null,
+  ip text not null,
+  window_start integer not null,
+  hits integer not null,
+  primary key (bucket, ip, window_start)
+);
+
+create index if not exists rate_limits_window on rate_limits (window_start);
+
 create table if not exists orders (
   id text primary key,
   slot_id integer not null,

@@ -1,6 +1,10 @@
+import { isIP } from "node:net";
+
 const YEAR = 60 * 60 * 24 * 365;
 
 const HALF_HOUR = 60 * 30;
+
+const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type VisitIds = {
   vid: string;
@@ -43,9 +47,9 @@ export function visitIds(request: Request): {
 } {
   const header = request.headers.get("cookie") ?? "";
 
-  const vid = readCookie(header, "vid") ?? crypto.randomUUID();
+  const vid = visitorId(header, "vid");
 
-  const sid = readCookie(header, "sid") ?? crypto.randomUUID();
+  const sid = visitorId(header, "sid");
 
   return {
     ids: { vid, sid },
@@ -65,6 +69,35 @@ export function applyCookies(
   }
 
   return response;
+}
+
+function visitorId(header: string, name: string) {
+  const value = readCookie(header, name);
+
+  if (value && ID.test(value)) {
+    return value.toLowerCase();
+  }
+
+  return crypto.randomUUID();
+}
+
+export function clientIp(request: Request) {
+  const cf = request.headers.get("cf-connecting-ip")?.trim() ?? "";
+
+  if (isIP(cf)) {
+    return cf.toLowerCase();
+  }
+
+  const forwarded = request.headers
+    .get("x-forwarded-for")
+    ?.split(",")[0]
+    ?.trim() ?? "";
+
+  if (isIP(forwarded)) {
+    return forwarded.toLowerCase();
+  }
+
+  return "unknown";
 }
 
 export function requestCountry(request: Request) {
