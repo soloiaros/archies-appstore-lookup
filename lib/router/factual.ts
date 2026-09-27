@@ -97,14 +97,16 @@ export async function answerFactual(
 function loadRevenue(
   trackId: number,
 ): Reading<RevenueBand> {
-  const db = openCatalog();
-
   try {
-    return readLatestRevenue(db, trackId);
+    const db = openCatalog();
+
+    try {
+      return readLatestRevenue(db, trackId);
+    } finally {
+      db.close();
+    }
   } catch {
     return unavailable();
-  } finally {
-    db.close();
   }
 }
 

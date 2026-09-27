@@ -1,6 +1,13 @@
-import { loadLocalEnv } from "@/lib/env";
+import {
+  cloudCatalog,
+  lexicalDiscovery,
+} from "@/lib/catalog/cloud";
 
 import { sqliteCatalog } from "@/lib/catalog/sqlite";
+
+import { loadLocalEnv } from "@/lib/env";
+
+import { catalogDb } from "@/lib/site/db";
 
 import { answerComparative } from "@/lib/router/comparative";
 
@@ -17,7 +24,11 @@ export async function answer(
 ): Promise<QueryAnswer> {
   const shape = classify(query);
 
-  const catalog = sqliteCatalog();
+  const remote = await catalogDb();
+
+  const catalog = remote
+    ? cloudCatalog(remote)
+    : sqliteCatalog();
 
   try {
     if (shape === "factual") {
@@ -32,6 +43,12 @@ export async function answer(
         query,
         catalog,
       );
+    }
+
+    if (remote) {
+      const found = await catalog.finalists(query);
+
+      return lexicalDiscovery(query, found);
     }
 
     const { answerDiscovery } = await import(
