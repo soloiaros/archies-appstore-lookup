@@ -445,16 +445,6 @@ const REVENUE_BASES = new Set<RevenueBasis>([
   "below-grossing",
 ]);
 
-export async function indexedAppCount(
-  sql: SiteSql,
-): Promise<number> {
-  const row = await sql.get<{ n: number }>(
-    "select count(*) as n from apps where delisted = 0",
-  );
-
-  return Number(row?.n ?? 0);
-}
-
 async function lexicalFinalists(
   sql: SiteSql,
   query: string,
