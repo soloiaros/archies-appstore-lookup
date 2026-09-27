@@ -1,3 +1,5 @@
+import { tooMany, underLimit } from "@/lib/site/limit";
+
 import { recordView } from "@/lib/site/stats";
 
 import {
@@ -27,6 +29,12 @@ export async function POST(request: Request) {
       { error: "Missing a page path." },
       { status: 400 },
     );
+  }
+
+  const allowed = await underLimit(request, "collect", 120);
+
+  if (!allowed) {
+    return tooMany("Too many requests. Try again in an hour.");
   }
 
   const visit = visitIds(request);

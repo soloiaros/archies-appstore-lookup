@@ -1,3 +1,5 @@
+import { tooMany, underLimit } from "@/lib/site/limit";
+
 import { answer } from "@/lib/router";
 
 type QueryBody = {
@@ -24,6 +26,14 @@ export async function POST(
       {
         status: 400,
       },
+    );
+  }
+
+  const allowed = await underLimit(request, "query", 50);
+
+  if (!allowed) {
+    return tooMany(
+      "Too many searches from this network. Try again in an hour.",
     );
   }
 

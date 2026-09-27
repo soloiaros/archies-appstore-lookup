@@ -1,3 +1,5 @@
+import { allowOrder, tooMany } from "@/lib/site/limit";
+
 import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
 
 import {
@@ -146,6 +148,14 @@ export async function POST(request: Request) {
     return Response.json(
       { error: "Check the link, name, email, and description." },
       { status: 400 },
+    );
+  }
+
+  const allowed = await allowOrder(request);
+
+  if (!allowed) {
+    return tooMany(
+      "Too many orders from this network. Try again later.",
     );
   }
 

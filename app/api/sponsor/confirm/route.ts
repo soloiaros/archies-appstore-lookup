@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { underLimit } from "@/lib/site/limit";
+
 import { confirmOrder, readOrder } from "@/lib/site/slots";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +48,7 @@ function escape(value: string) {
 function keyMatches(given: string) {
   const expected = process.env.SPONSOR_ADMIN_KEY;
 
-  if (!expected || !given) {
+  if (!expected || expected.length < 32 || !given) {
     return false;
   }
 
@@ -85,7 +87,7 @@ export async function GET(request: Request) {
   return page(
     "Confirm payment",
     `<h1>Confirm slot ${label}</h1>
-<p>${escape(order.name ?? "")} · ${escape(order.email)}</p>
+<p>This hold is still open.</p>
 <form method="post">
 <input type="hidden" name="order" value="${escape(order.id)}">
 <input type="password" name="key" placeholder="Admin key" autocomplete="current-password" required>
@@ -95,6 +97,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const allowed = await underLimit(request, "sponsor-confirm", 10);
+
+  if (!allowed) {
+    return page(
+      "Slow down",
+      "<h1>Too many attempts</h1><p>Try again in an hour.</p>",
+      429,
+    );
+  }
+
   const form = await request.formData().catch(() => null);
 
   const orderId = String(form?.get("order") ?? "");
