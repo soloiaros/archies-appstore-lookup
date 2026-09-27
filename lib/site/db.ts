@@ -65,6 +65,16 @@ async function cloudflareEnv(): Promise<CfEnv | null> {
   }
 }
 
+export async function siteReader(): Promise<SiteSql | null> {
+  const env = await cloudflareEnv();
+
+  if (!env?.SITE_DB) {
+    return null;
+  }
+
+  return fromD1(env.SITE_DB);
+}
+
 export async function siteDb(): Promise<SiteSql> {
   const env = await cloudflareEnv();
 

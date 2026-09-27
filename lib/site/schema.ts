@@ -45,6 +45,12 @@ create table if not exists orders (
 
 create index if not exists orders_email on orders (email, status);
 
+create table if not exists meta (
+  key text primary key,
+  value integer not null,
+  updated_at integer not null
+);
+
 insert or ignore into slots (
   id,
   kind,
