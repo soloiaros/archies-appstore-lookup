@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { OutputShell } from "@/components/OutputShell";
+
 export function NoticeSurface({
   children,
   role,
@@ -31,15 +33,7 @@ export function NoticeSurface({
     </div>
   );
 
-  if (!ready) {
-    return (
-      <div className="notice-beam backdrop-blur-[48px] backdrop-saturate-[1.7]">
-        {body}
-      </div>
-    );
-  }
-
-  return (
+  const beam = ready ? (
     <BorderBeam
       size="pulse-inner"
       colorVariant="mono"
@@ -49,9 +43,19 @@ export function NoticeSurface({
       duration={3.2}
       brightness={1.15}
       borderRadius={16}
-      className="notice-beam backdrop-blur-[48px] backdrop-saturate-[1.7]"
+      className="notice-beam"
     >
       {body}
     </BorderBeam>
+  ) : (
+    <div className="notice-beam">
+      {body}
+    </div>
+  );
+
+  return (
+    <OutputShell>
+      {beam}
+    </OutputShell>
   );
 }

@@ -27,6 +27,8 @@ import {
 
 import { NoticeSurface } from "@/components/NoticeSurface";
 
+import { OutputShell } from "@/components/OutputShell";
+
 import { LiveStats } from "@/components/LiveStats";
 
 import { SearchComposer } from "@/components/SearchComposer";
@@ -547,7 +549,7 @@ export function QueryScreen({
           {state.phase === "done"
           && route === "factual"
           && state.answer.shape === "factual" ? (
-            <div className="answer-float backdrop-blur-[48px] backdrop-saturate-[1.7]">
+            <OutputShell>
               <FactualCard
                 query={state.answer.query}
                 app={state.answer.app}
@@ -556,18 +558,18 @@ export function QueryScreen({
                   void openById(trackId, null);
                 }}
               />
-            </div>
+            </OutputShell>
           ) : null}
 
           {state.phase === "done"
           && route === "comparative"
           && state.answer.shape === "comparative" ? (
-            <div className="answer-float backdrop-blur-[48px] backdrop-saturate-[1.7]">
+            <OutputShell>
               <ComparativeList
                 rows={state.answer.rows}
                 tier={state.answer.tier}
               />
-            </div>
+            </OutputShell>
           ) : null}
         </>
       )}
@@ -575,6 +577,7 @@ export function QueryScreen({
       <SponsorRails
         slots={slots}
         priceLabel={priceLabel}
+        quiet={outputShown}
       />
     </>
   );

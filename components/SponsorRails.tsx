@@ -107,10 +107,13 @@ function Strip({
 export function SponsorRails({
   slots,
   priceLabel,
+  quiet,
 }: {
   slots: SlotView[];
 
   priceLabel: string;
+
+  quiet?: boolean;
 }) {
   const [root, setRoot] = useState<HTMLElement | null>(null);
 
@@ -129,7 +132,10 @@ export function SponsorRails({
   }
 
   return createPortal(
-    <div className="sponsor-rails">
+    <div
+      className="sponsor-rails"
+      data-quiet={quiet ? "true" : "false"}
+    >
       <aside
         className="sponsor-rail sponsor-rail-left"
         aria-label="Sponsors"
