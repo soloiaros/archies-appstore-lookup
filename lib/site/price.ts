@@ -1,4 +1,4 @@
-const DEFAULT_CENTS = 150_000;
+const DEFAULT_CENTS = 40_000;
 
 export function sponsorPriceCents(): number {
   const raw = process.env.SPONSOR_PRICE_CENTS;
