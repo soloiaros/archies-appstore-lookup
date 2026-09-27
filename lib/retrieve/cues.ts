@@ -1,7 +1,7 @@
 const COLOR_WORD =
   /\b(red|orange|yellow|green|blue|purple|violet|pink|brown|black|white|gr[ae]y|beige|cream|teal|cyan|navy|lime|gold|silver|magenta|maroon|turquoise|indigo|dark|light|bright|pastel|neon|colou?r\w*)\b/i;
 
-const LETTER_WORDS = new Set(
+export const LETTER_WORDS = new Set(
   "letter letters text texts word words writing written write say says saying spelled printed reads read".split(
     " ",
   ),

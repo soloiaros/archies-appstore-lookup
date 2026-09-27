@@ -15,6 +15,7 @@ import type { IndexedApp } from "@/lib/retrieve/memory";
 import { warmIndex } from "@/lib/retrieve/memory";
 
 import {
+  LETTER_WORDS,
   queryMentionsColor,
   queryMentionsLetters,
 } from "@/lib/retrieve/cues";
