@@ -44,6 +44,107 @@ function insert(table, columns, rows) {
   return lines;
 }
 
+const vectorsOnly = process.argv.includes("vectors");
+
+if (vectorsOnly) {
+  const texts = db.prepare(`
+    select track_id, tier, method, model, vector
+    from text_embeddings
+  `).all();
+
+  const tags = db.prepare(`
+    select track_id, tag_id, tier, method
+    from app_tags
+  `).all();
+
+  const signals = db.prepare(`
+    select track_id, tier, method, color_text, colors, letters
+    from icon_signals
+  `).all();
+
+  const revenue = db.prepare(`
+    select
+      track_id,
+      captured_on,
+      country,
+      basis,
+      rank,
+      chart,
+      genre_id,
+      low_usd,
+      mid_usd,
+      high_usd,
+      tier,
+      method
+    from revenue_estimates
+  `).all();
+
+  const encoded = texts.map((row) => ({
+    track_id: row.track_id,
+    tier: row.tier,
+    method: row.method,
+    model: row.model,
+    vector: Buffer.from(row.vector).toString("base64"),
+  }));
+
+  const sql = [
+    ...insert("text_embeddings", [
+      { name: "track_id", type: "integer primary key" },
+      { name: "tier", type: "text" },
+      { name: "method", type: "text" },
+      { name: "model", type: "text" },
+      { name: "vector", type: "text" },
+    ], encoded),
+    "create table if not exists app_tags (track_id integer, tag_id text, tier text, method text, primary key (track_id, tag_id));",
+    ...insert("app_tags", [
+      { name: "track_id", type: "integer" },
+      { name: "tag_id", type: "text" },
+      { name: "tier", type: "text" },
+      { name: "method", type: "text" },
+    ], tags).slice(1),
+    ...insert("icon_signals", [
+      { name: "track_id", type: "integer primary key" },
+      { name: "tier", type: "text" },
+      { name: "method", type: "text" },
+      { name: "color_text", type: "text" },
+      { name: "colors", type: "text" },
+      { name: "letters", type: "text" },
+    ], signals),
+    "create table if not exists revenue_estimates (track_id integer, captured_on text, country text, basis text, rank integer, chart text, genre_id integer, low_usd real, mid_usd real, high_usd real, tier text, method text, primary key (track_id, captured_on, country, chart, genre_id));",
+    ...insert("revenue_estimates", [
+      { name: "track_id", type: "integer" },
+      { name: "captured_on", type: "text" },
+      { name: "country", type: "text" },
+      { name: "basis", type: "text" },
+      { name: "rank", type: "integer" },
+      { name: "chart", type: "text" },
+      { name: "genre_id", type: "integer" },
+      { name: "low_usd", type: "real" },
+      { name: "mid_usd", type: "real" },
+      { name: "high_usd", type: "real" },
+      { name: "tier", type: "text" },
+      { name: "method", type: "text" },
+    ], revenue).slice(1),
+  ].join("\n");
+
+  writeFileSync("/tmp/catalog-vectors.sql", sql);
+
+  console.log(
+    "vectors",
+    encoded.length,
+    "tags",
+    tags.length,
+    "signals",
+    signals.length,
+    "revenue",
+    revenue.length,
+    "bytes",
+    sql.length,
+  );
+
+  process.exit(0);
+}
+
 const apps = db.prepare("select * from apps").all();
 
 const ratings = db.prepare("select * from rating_snapshots").all();
