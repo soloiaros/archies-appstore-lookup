@@ -15,6 +15,8 @@ type PresenceNamespace = {
 type CfEnv = {
   SITE_DB?: D1Database;
 
+  CATALOG_DB?: D1Database;
+
   PRESENCE?: PresenceNamespace;
 };
 
@@ -63,6 +65,16 @@ export async function siteDb(): Promise<SiteSql> {
   }
 
   return sqliteSite();
+}
+
+export async function catalogDb(): Promise<SiteSql | null> {
+  const env = await cloudflareEnv();
+
+  if (!env?.CATALOG_DB) {
+    return null;
+  }
+
+  return fromD1(env.CATALOG_DB);
 }
 
 export async function presenceNamespace(): Promise<PresenceNamespace | null> {
