@@ -1,4 +1,6 @@
-import { workersAi } from "@/lib/site/db";
+import tagFile from "@/data/tags/tags.json";
+
+import { iconEmbed, workersAi } from "@/lib/site/db";
 
 import type { SiteSql } from "@/lib/site/types";
 
@@ -18,7 +20,15 @@ const ASKING =
 
 const BGE_DIMS = 384;
 
+const SIGLIP_MODEL = "onnx-community/siglip2-base-patch16-224-ONNX";
+
+const SIGLIP_DIMS = 768;
+
 const BY_MEANING = 40;
+
+const BY_LOOKS = 40;
+
+const BY_TAGS = 16;
 
 const BY_LEXICAL = 16;
 
@@ -26,11 +36,35 @@ const BY_NAME = 25;
 
 const FINALIST_CAP = 120;
 
+const DEEPEN_CAP = 60;
+
+const TAGS = tagFile.tags;
+
 const PAGE = 500;
+
+type CatalogApp = {
+  trackId: number;
+
+  name: string;
+
+  blurb: string;
+
+  letters: string;
+
+  tags: string[];
+};
 
 let textVectors: Map<number, Float32Array> | null = null;
 
 let textLoad: Promise<Map<number, Float32Array>> | null = null;
+
+let iconVectors: Map<number, Float32Array> | null = null;
+
+let iconLoad: Promise<Map<number, Float32Array>> | null = null;
+
+let catalogApps: CatalogApp[] | null = null;
+
+let catalogLoad: Promise<CatalogApp[]> | null = null;
 
 export async function vectorFinalists(
   sql: SiteSql,
@@ -58,6 +92,8 @@ export async function vectorFinalists(
       );
     };
 
+    const apps = await loadCatalog(sql);
+
     const meaning = [...vectors.entries()]
       .map(([trackId, vector]) => ({
         trackId,
@@ -70,21 +106,43 @@ export async function vectorFinalists(
       bump(hit.trackId, hit.score);
     }
 
-    for (const trackId of await nameHits(sql, query)) {
-      bump(trackId, 0.95);
+    try {
+      const looking = await embedIconQuery(query);
+
+      const icons = await loadIconVectors(sql);
+
+      if (looking && icons.size > 0) {
+        const looks = [...icons.entries()]
+          .map(([trackId, vector]) => ({
+            trackId,
+            score: cosine(looking, vector),
+          }))
+          .sort((left, right) => right.score - left.score)
+          .slice(0, BY_LOOKS);
+
+        for (const hit of looks) {
+          bump(hit.trackId, 0.5 + hit.score);
+        }
+      }
+    } catch {
+      // icon channel skipped
     }
 
-    for (const hit of await lexicalHits(sql, query)) {
+    for (const hit of tagOverlap(query, apps).slice(0, BY_TAGS)) {
+      bump(hit.trackId, 0.4 + hit.score);
+    }
+
+    for (const hit of lexicalHits(query, apps).slice(0, BY_LEXICAL)) {
       bump(hit.trackId, 0.3 + hit.score);
     }
 
+    for (const trackId of nameHits(query, apps).slice(0, BY_NAME)) {
+      bump(trackId, 0.95);
+    }
+
     if (queryMentionsLetters(query)) {
-      try {
-        for (const trackId of await letterHits(sql, query)) {
-          bump(trackId, 0.9);
-        }
-      } catch {
-        // signals absent
+      for (const trackId of letterHits(query, apps)) {
+        bump(trackId, 0.9);
       }
     }
 
@@ -202,7 +260,10 @@ async function readTextVectors(
     for (const row of rows) {
       const trackId = Number(row.trackId);
 
-      const vector = decodeVector(String(row.vector ?? ""));
+      const vector = decodeVector(
+        String(row.vector ?? ""),
+        BGE_DIMS * 4,
+      );
 
       if (vector) {
         vectors.set(trackId, vector);
@@ -219,14 +280,312 @@ async function readTextVectors(
   return vectors;
 }
 
-function decodeVector(encoded: string): Float32Array | null {
+async function embedIconQuery(
+  query: string,
+): Promise<Float32Array | null> {
+  const namespace = await iconEmbed();
+
+  if (!namespace) {
+    return null;
+  }
+
+  const response = await namespace
+    .getByName("siglip")
+    .fetch("http://icon-embed/", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+      signal: AbortSignal.timeout(45_000),
+    });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = await response.json() as {
+    vector?: number[];
+  };
+
+  if (!body.vector || body.vector.length !== SIGLIP_DIMS) {
+    return null;
+  }
+
+  return l2Normalize(Float32Array.from(body.vector));
+}
+
+async function loadIconVectors(
+  sql: SiteSql,
+): Promise<Map<number, Float32Array>> {
+  if (iconVectors && iconVectors.size > 0) {
+    return iconVectors;
+  }
+
+  if (!iconLoad) {
+    iconLoad = readIconVectors(sql)
+      .then((map) => {
+        if (map.size > 0) {
+          iconVectors = map;
+        }
+
+        iconLoad = null;
+
+        return map;
+      })
+      .catch((error) => {
+        iconLoad = null;
+
+        throw error;
+      });
+  }
+
+  return iconLoad;
+}
+
+async function readIconVectors(
+  sql: SiteSql,
+): Promise<Map<number, Float32Array>> {
+  const vectors = new Map<number, Float32Array>();
+
+  let after = 0;
+
+  const page = 200;
+
+  for (;;) {
+    const rows = await sql.all<{
+      trackId: number;
+      vector: string;
+    }>(
+      `
+      select track_id as trackId, vector
+      from icon_embeddings
+      where model = ? and track_id > ?
+      order by track_id
+      limit ${page}
+      `,
+      [SIGLIP_MODEL, after],
+    );
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    for (const row of rows) {
+      const trackId = Number(row.trackId);
+
+      const vector = decodeVector(
+        String(row.vector ?? ""),
+        SIGLIP_DIMS * 4,
+      );
+
+      if (vector) {
+        vectors.set(trackId, vector);
+      }
+
+      after = trackId;
+    }
+
+    if (rows.length < page) {
+      break;
+    }
+  }
+
+  return vectors;
+}
+
+async function loadCatalog(
+  sql: SiteSql,
+): Promise<CatalogApp[]> {
+  if (catalogApps && catalogApps.length > 0) {
+    return catalogApps;
+  }
+
+  if (!catalogLoad) {
+    catalogLoad = readCatalog(sql)
+      .then((apps) => {
+        if (apps.length > 0) {
+          catalogApps = apps;
+        }
+
+        catalogLoad = null;
+
+        return apps;
+      })
+      .catch((error) => {
+        catalogLoad = null;
+
+        throw error;
+      });
+  }
+
+  return catalogLoad;
+}
+
+async function readCatalog(
+  sql: SiteSql,
+): Promise<CatalogApp[]> {
+  const apps: CatalogApp[] = [];
+
+  let after = 0;
+
+  for (;;) {
+    const rows = await sql.all<{
+      trackId: number;
+      name: string;
+      blurb: string;
+    }>(
+      `
+      select
+        track_id as trackId,
+        name,
+        substr(description, 1, 800) as blurb
+      from apps
+      where delisted = 0 and track_id > ?
+      order by track_id
+      limit ${PAGE}
+      `,
+      [after],
+    );
+
+    if (rows.length === 0) {
+      break;
+    }
+
+    for (const row of rows) {
+      const trackId = Number(row.trackId);
+
+      apps.push({
+        trackId,
+        name: String(row.name ?? ""),
+        blurb: String(row.blurb ?? ""),
+        letters: "",
+        tags: [],
+      });
+
+      after = trackId;
+    }
+
+    if (rows.length < PAGE) {
+      break;
+    }
+  }
+
+  const byId = new Map(apps.map((app) => [app.trackId, app]));
+
+  try {
+    let signalAfter = 0;
+
+    for (;;) {
+      const rows = await sql.all<{
+        trackId: number;
+        letters: string;
+      }>(
+        `
+        select track_id as trackId, letters
+        from icon_signals
+        where track_id > ?
+        order by track_id
+        limit ${PAGE}
+        `,
+        [signalAfter],
+      );
+
+      if (rows.length === 0) {
+        break;
+      }
+
+      for (const row of rows) {
+        const trackId = Number(row.trackId);
+
+        const app = byId.get(trackId);
+
+        if (app) {
+          app.letters = String(row.letters ?? "");
+        }
+
+        signalAfter = trackId;
+      }
+
+      if (rows.length < PAGE) {
+        break;
+      }
+    }
+  } catch {
+    // letters absent
+  }
+
+  try {
+    const rows = await sql.all<{
+      trackId: number;
+      tagId: string;
+    }>(
+      `
+      select track_id as trackId, tag_id as tagId
+      from app_tags
+      `,
+    );
+
+    for (const row of rows) {
+      const app = byId.get(Number(row.trackId));
+
+      if (app) {
+        app.tags.push(String(row.tagId));
+      }
+    }
+  } catch {
+    // tags absent
+  }
+
+  return apps;
+}
+
+export async function deepenCandidates(
+  sql: SiteSql,
+  excluded: number[],
+  tagIds: string[],
+): Promise<Finalist[]> {
+  if (tagIds.length === 0) {
+    return [];
+  }
+
+  const skip = new Set(excluded);
+
+  const marks = tagIds.map(() => "?").join(", ");
+
+  const rows = await sql.all<{ trackId: number }>(
+    `
+    select distinct track_id as trackId
+    from app_tags
+    where tag_id in (${marks})
+    order by track_id
+    `,
+    tagIds,
+  );
+
+  const ids = rows
+    .map((row) => Number(row.trackId))
+    .filter((trackId) => !skip.has(trackId))
+    .slice(0, DEEPEN_CAP);
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return hydrate(sql, ids);
+}
+
+function decodeVector(
+  encoded: string,
+  width: number,
+): Float32Array | null {
   if (encoded.length === 0) {
     return null;
   }
 
   const bytes = Buffer.from(encoded, "base64");
 
-  if (bytes.byteLength !== BGE_DIMS * 4) {
+  if (bytes.byteLength !== width) {
     return null;
   }
 
@@ -284,71 +643,38 @@ function tokenize(text: string): string[] {
     .filter(Boolean);
 }
 
-async function nameHits(
-  sql: SiteSql,
+function nameHits(
   query: string,
-): Promise<number[]> {
-  const words = wordsOf(query, 4).slice(0, 8);
+  apps: CatalogApp[],
+): number[] {
+  const words = wordsOf(query, 4);
 
   if (words.length === 0) {
     return [];
   }
 
-  const where = words
-    .map(() => "lower(name) like ?")
-    .join(" or ");
+  return apps
+    .filter((app) => {
+      const name = app.name.toLowerCase();
 
-  const rows = await sql.all<{ trackId: number }>(
-    `
-    select track_id as trackId
-    from apps
-    where delisted = 0
-      and (${where})
-    limit ${BY_NAME}
-    `,
-    words.map((word) => `%${word}%`),
-  );
-
-  return rows.map((row) => Number(row.trackId));
+      return words.some((word) => name.includes(word));
+    })
+    .map((app) => app.trackId);
 }
 
-async function lexicalHits(
-  sql: SiteSql,
+function lexicalHits(
   query: string,
-): Promise<Array<{ trackId: number; score: number }>> {
-  const words = wordsOf(query, 3).slice(0, 8);
+  apps: CatalogApp[],
+): Array<{ trackId: number; score: number }> {
+  const words = wordsOf(query, 3);
 
   if (words.length === 0) {
     return [];
   }
 
-  const where = words
-    .map(() => "(lower(name) like ? or lower(description) like ?)")
-    .join(" or ");
-
-  const params = words.flatMap((word) => [`%${word}%`, `%${word}%`]);
-
-  const rows = await sql.all<{
-    trackId: number;
-    name: string;
-    blurb: string;
-  }>(
-    `
-    select
-      track_id as trackId,
-      name,
-      substr(description, 1, 800) as blurb
-    from apps
-    where delisted = 0
-      and (${where})
-    limit 200
-    `,
-    params,
-  );
-
-  return rows
-    .map((row) => {
-      const hay = tokenize(`${row.name} ${row.blurb ?? ""}`);
+  return apps
+    .map((app) => {
+      const hay = tokenize(`${app.name} ${app.blurb}`);
 
       let hits = 0;
 
@@ -359,45 +685,84 @@ async function lexicalHits(
       }
 
       return {
-        trackId: Number(row.trackId),
+        trackId: app.trackId,
         score: hits / words.length,
       };
     })
     .filter((row) => row.score > 0)
-    .sort((left, right) => right.score - left.score)
-    .slice(0, BY_LEXICAL);
+    .sort((left, right) => right.score - left.score);
 }
 
-async function letterHits(
-  sql: SiteSql,
+function letterHits(
   query: string,
-): Promise<number[]> {
-  const words = tokenize(query)
-    .filter(
-      (word) => word.length >= 3 && !LETTER_WORDS.has(word),
-    )
-    .slice(0, 8);
+  apps: CatalogApp[],
+): number[] {
+  const words = tokenize(query).filter(
+    (word) => word.length >= 3 && !LETTER_WORDS.has(word),
+  );
 
   if (words.length === 0) {
     return [];
   }
 
-  const where = words
-    .map(() => "lower(letters) like ?")
-    .join(" or ");
+  return apps
+    .filter((app) => {
+      const letters = app.letters.toLowerCase();
 
-  const rows = await sql.all<{ trackId: number }>(
-    `
-    select track_id as trackId
-    from icon_signals
-    where letters != ''
-      and (${where})
-    limit 40
-    `,
-    words.map((word) => `%${word}%`),
+      return (
+        letters.length > 0
+        && words.some((word) => letters.includes(word))
+      );
+    })
+    .map((app) => app.trackId);
+}
+
+function tagOverlap(
+  query: string,
+  apps: CatalogApp[],
+): Array<{ trackId: number; score: number }> {
+  const words = tokenize(query);
+
+  if (words.length === 0) {
+    return [];
+  }
+
+  const matched = new Set<string>();
+
+  for (const tag of TAGS) {
+    const hay = tokenize(`${tag.id} ${tag.label}`);
+
+    if (hay.some((word) => words.includes(word))) {
+      matched.add(tag.id);
+    }
+  }
+
+  if (matched.size === 0) {
+    return [];
+  }
+
+  const scores: Array<{ trackId: number; score: number }> = [];
+
+  for (const app of apps) {
+    let hits = 0;
+
+    for (const tag of app.tags) {
+      if (matched.has(tag)) {
+        hits += 1;
+      }
+    }
+
+    if (hits > 0) {
+      scores.push({
+        trackId: app.trackId,
+        score: hits / matched.size,
+      });
+    }
+  }
+
+  return scores.sort(
+    (left, right) => right.score - left.score,
   );
-
-  return rows.map((row) => Number(row.trackId));
 }
 
 async function hydrate(
