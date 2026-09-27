@@ -12,6 +12,15 @@ type PresenceNamespace = {
   };
 };
 
+export type IconEmbedNamespace = {
+  getByName(name: string): {
+    fetch(
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response>;
+  };
+};
+
 export type WorkersAi = {
   run(
     model: string,
@@ -30,6 +39,8 @@ type CfEnv = {
   PRESENCE?: PresenceNamespace;
 
   AI?: WorkersAi;
+
+  ICON_EMBED?: IconEmbedNamespace;
 };
 
 const d1Token = {};
@@ -87,6 +98,12 @@ export async function siteDb(): Promise<SiteSql> {
   }
 
   return sqliteSite();
+}
+
+export async function iconEmbed(): Promise<IconEmbedNamespace | null> {
+  const env = await cloudflareEnv();
+
+  return env?.ICON_EMBED ?? null;
 }
 
 export async function workersAi(): Promise<WorkersAi | null> {
