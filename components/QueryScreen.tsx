@@ -132,7 +132,10 @@ export function QueryScreen({
     if (
       state.phase !== "done"
       || state.answer.shape !== "discovery"
-      || state.answer.scoring !== "scored"
+      || (
+        state.answer.scoring !== "scored"
+        && state.answer.hits.length === 0
+      )
     ) {
       return [];
     }
@@ -421,6 +424,7 @@ export function QueryScreen({
       : state.phase === "done"
         && state.answer.shape === "discovery"
         && state.answer.scoring === "unavailable"
+        && state.answer.hits.length === 0
         ? {
             message:
               state.answer.scoringNote
