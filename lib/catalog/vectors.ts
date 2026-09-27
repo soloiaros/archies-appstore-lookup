@@ -297,7 +297,7 @@ async function embedIconQuery(
         "content-type": "application/json",
       },
       body: JSON.stringify({ query }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(180_000),
     });
 
   if (!response.ok) {
