@@ -249,10 +249,6 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       };
     };
     const stats = { stepMs: 0, drawMs: 0, awake: 0, swaps: 0, gx: 0, gy: 1, paced }; // read from the console as window.__floor when chasing lag
-    // #region agent log
-    const floorGen = ((window as unknown as { __floorMounts?: number }).__floorMounts = ((window as unknown as { __floorMounts?: number }).__floorMounts ?? 0) + 1);
-    fetch('http://127.0.0.1:7688/ingest/905fb9fa-cacf-4fc7-a090-bb922ff403b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e3b38f'},body:JSON.stringify({sessionId:'e3b38f',runId:'post-fix',hypothesisId:'E',location:'IconFloor.tsx:mount',message:'floor mount',data:{gen:floorGen,hadFloor:!!(window as unknown as { __floor?: unknown }).__floor},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     (window as unknown as { __floor?: unknown }).__floor = Object.assign(stats, createDebug(scene), {
       added: () => scene.added,
       bodyCount: () => bodies.length,
@@ -354,16 +350,11 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
 
     let seatSig = "";
     let publishedRev = -1;
-    let probeAt = 0;
-    let draws = 0;
-    let seatBuilds = 0;
-    let seatCommits = 0;
     const publishSeats = () => {
       const box = scene.box;
       if (!box) {
         if (seatSig !== "") {
           seatSig = "";
-          seatCommits++;
           publishSeatsRef.current([]);
         }
         publishedRev = scene.seatRev;
@@ -371,7 +362,6 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       }
       if (scene.seatRev === publishedRev) return;
       publishedRev = scene.seatRev;
-      seatBuilds++;
       const list: Seat[] = [];
       holds.forEach((hold) => {
         if (!hold.labelled && !hold.parked) return;
@@ -390,7 +380,6 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       const sig = list.map((seat) => `${seat.trackId}:${Math.round(seat.left)}:${Math.round(seat.top)}:${Math.round(seat.side)}`).join("|");
       if (sig === seatSig) return;
       seatSig = sig;
-      seatCommits++;
       publishSeatsRef.current(list);
     };
 
@@ -482,44 +471,9 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       if (scene.dirty) {
         const t0 = performance.now();
         draw();
-        draws++;
         stats.drawMs += (performance.now() - t0 - stats.drawMs) * 0.1;
         scene.dirty = false;
       } else if (pops.size) drawSwaps();
-      // #region agent log
-      if (now - probeAt > 400 && (holds.size > 0 || frames === 120)) {
-        probeAt = now;
-        let stuck = 0;
-        let openMask = 0;
-        let maxBoost = 1;
-        let unparked = 0;
-        let worst = 0;
-        let matchContacts = 0;
-        holds.forEach((hold, i) => {
-          if (hold.parked) return;
-          unparked++;
-          const body = bodies[i];
-          if (body.collisionFilter.mask !== 0) openMask++;
-          if (hold.boost > maxBoost) maxBoost = hold.boost;
-          const restY = hold.rest.y - scene.scroll;
-          const dist = Math.hypot(hold.rest.x - body.position.x, restY - body.position.y);
-          if (dist > worst) worst = dist;
-          const speed = Math.hypot(body.velocity.x, body.velocity.y);
-          if (!hold.arrived && dist > 40 && speed < 3 && hold.t > 0.35) stuck++;
-        });
-        const pairs = engine.pairs.list;
-        for (let p = 0; p < pairs.length; p++) {
-          const pair = pairs[p];
-          if (!pair.isActive) continue;
-          if (pair.bodyA.collisionFilter.group === -1 || pair.bodyB.collisionFilter.group === -1) matchContacts++;
-        }
-        const sample = { awake, stepMs: +stats.stepMs.toFixed(2), drawMs: +stats.drawMs.toFixed(2), holds: holds.size, unparked, openMask, stuck, maxBoost: +maxBoost.toFixed(2), worst: Math.round(worst), matchContacts, draws, seatBuilds, seatCommits, added: scene.added };
-        draws = 0;
-        seatBuilds = 0;
-        seatCommits = 0;
-        fetch('http://127.0.0.1:7688/ingest/905fb9fa-cacf-4fc7-a090-bb922ff403b3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e3b38f'},body:JSON.stringify({sessionId:'e3b38f',runId:'post-fix',hypothesisId:'B',location:'IconFloor.tsx:frame',message:'floor sample',data:sample,timestamp:Date.now()})}).catch(()=>{});
-      }
-      // #endregion
     };
     raf = requestAnimationFrame(frame);
     // Background / automated tabs throttle rAF to nothing; drive the loop from a timer too.
