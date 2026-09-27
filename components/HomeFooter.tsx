@@ -7,9 +7,9 @@ const GITHUB_AUTHOR = "https://github.com/soloiaros";
 
 const ARCHIE_URL = "https://github.com/archieauburn";
 
-const INSTAGRAM_URL = "https://instagram.com";
+const INSTAGRAM_URL = "https://www.instagram.com/archieauburn/";
 
-const X_URL = "https://x.com";
+const X_URL = "https://x.com/archieauburn";
 
 const LINKS = [
   {
