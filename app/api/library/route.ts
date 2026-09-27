@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { sampleIconUrls } from "@/lib/catalog/sample";
+
 import { openCatalog } from "@/lib/scrape/store";
 
 import { catalogDb } from "@/lib/site/db";
@@ -23,20 +25,10 @@ export async function GET(
   const remote = await catalogDb();
 
   if (remote) {
-    const rows = await remote.all<{ src: string }>(
-      `
-      select icon_url as src
-      from apps
-      where icon_url != ''
-        and delisted = 0
-      order by random()
-      limit ?
-      `,
-      [sample],
-    );
+    const srcs = await sampleIconUrls(remote, sample);
 
     return NextResponse.json({
-      srcs: rows.map((row) => String(row.src)),
+      srcs,
     });
   }
 

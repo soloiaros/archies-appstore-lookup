@@ -12,9 +12,7 @@ import { VendingMachineScene } from "@/components/VendingMachineScene";
 
 import { pileAtlas } from "@/lib/atlas";
 
-import { indexedAppCount } from "@/lib/catalog/cloud";
-
-import { catalogDb } from "@/lib/site/db";
+import { shownIndexedCount } from "@/lib/catalog/shown-count";
 
 export const dynamic = "force-dynamic";
 
@@ -37,15 +35,9 @@ const STEPS = [
 ] as const;
 
 export default async function HomePage() {
-  const remote = await catalogDb();
-
-  const counted = remote
-    ? await indexedAppCount(remote)
-    : 0;
-
-  const indexed = counted > 0
-    ? counted
-    : pileAtlas()?.indexed ?? 0;
+  const indexed = await shownIndexedCount(
+    pileAtlas()?.indexed ?? 0,
+  );
 
   return (
     <SectionPage>

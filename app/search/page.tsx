@@ -4,9 +4,7 @@ import { QueryScreen } from "@/components/QueryScreen";
 
 import { pileAtlas } from "@/lib/atlas";
 
-import { indexedAppCount } from "@/lib/catalog/cloud";
-
-import { catalogDb } from "@/lib/site/db";
+import { shownIndexedCount } from "@/lib/catalog/shown-count";
 
 import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
 
@@ -29,15 +27,11 @@ const shuffle = <T,>(list: T[]) => {
 export default async function SearchPage() {
   const atlas = pileAtlas();
 
-  const remote = await catalogDb();
+  const counted = await shownIndexedCount(
+    atlas?.indexed ?? atlas?.ids.length ?? 0,
+  );
 
-  const counted = remote
-    ? await indexedAppCount(remote)
-    : 0;
-
-  let indexed = counted > 0
-    ? counted
-    : atlas?.indexed ?? atlas?.ids.length ?? 0;
+  let indexed = counted;
 
   let loose: Array<{
     id: string;
@@ -61,7 +55,7 @@ export default async function SearchPage() {
 
       const scene = pileScene(PILE);
 
-      if (counted === 0) {
+      if (indexed === 0) {
         indexed = scene.indexed;
       }
 
