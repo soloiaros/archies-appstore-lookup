@@ -132,7 +132,7 @@ export function SearchComposer({
   return (
     <BorderBeam
       size="pulse-inner"
-      colorVariant="mono"
+      colorVariant={busy ? "colorful" : "mono"}
       theme="dark"
       active
       strength={busy ? 1 : 0.38}

@@ -33,7 +33,7 @@ export function NoticeSurface({
 
   if (!ready) {
     return (
-      <div className="notice-beam">
+      <div className="notice-beam backdrop-blur-[48px] backdrop-saturate-[1.7]">
         {body}
       </div>
     );
@@ -49,7 +49,7 @@ export function NoticeSurface({
       duration={3.2}
       brightness={1.15}
       borderRadius={16}
-      className="notice-beam"
+      className="notice-beam backdrop-blur-[48px] backdrop-saturate-[1.7]"
     >
       {body}
     </BorderBeam>

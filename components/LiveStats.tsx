@@ -56,8 +56,6 @@ export function LiveStats() {
 
       <span className="live-stats-rule" aria-hidden />
 
-      <span className="here-dot" aria-hidden />
-
       <span>
         {here === null ? "…" : here.toLocaleString("en-US")}
         {" "}

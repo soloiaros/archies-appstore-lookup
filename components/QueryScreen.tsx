@@ -25,8 +25,6 @@ import {
   type Seat,
 } from "@/components/IconFloor";
 
-import { ProvenanceMark } from "@/components/ProvenanceMark";
-
 import { NoticeSurface } from "@/components/NoticeSurface";
 
 import { LiveStats } from "@/components/LiveStats";
@@ -467,104 +465,111 @@ export function QueryScreen({
           onBack={closeDetail}
         />
       ) : (
-        <SearchPage>
-          <main className="stage-layer">
-            <div
-              ref={bar}
-              className="stage-bar"
-            >
+        <>
+          <SearchPage>
+            <main className="stage-layer">
               <div
-                className="stage-head"
-                data-hidden={outputShown ? "true" : "false"}
-                aria-hidden={outputShown || undefined}
-                inert={outputShown || undefined}
+                ref={bar}
+                className="stage-bar"
               >
-                <h1>Name an app feature.</h1>
+                <div
+                  className="stage-head"
+                  data-hidden={outputShown ? "true" : "false"}
+                  aria-hidden={outputShown || undefined}
+                  inert={outputShown || undefined}
+                >
+                  <h1>Name an app feature.</h1>
 
-                <p className="stage-sub">
-                  Get all matching apps on the AppStore.
-                </p>
+                  <p className="stage-sub">
+                    Get all matching apps on the AppStore.
+                  </p>
 
-                <LiveStats />
-              </div>
+                  <LiveStats />
+                </div>
 
-              <SearchComposer
-                value={text}
-                onChange={onType}
-                onSubmit={submit}
-                onClear={() => {
-                  reset();
-                  setText("");
-                  setDetail(null);
-                  floor.current?.ghost(null);
-                }}
-                busy={busy}
-              />
-
-              <div className="indexed-line">
-                <StoreMark size={13} />
-                <span>
-                  {indexed.toLocaleString()}
-                  {" "}
-                  apps indexed
-                </span>
-              </div>
-
-              {discoveryTier
-              && matches.length > 0 ? (
-                <p className="discovery-tier">
-                  <ProvenanceMark
-                    tier={discoveryTier}
-                  />
-                </p>
-              ) : null}
-            </div>
-
-            {notice ? (
-              <NoticeSurface role="alert">
-                <p>{notice.message}</p>
-
-                {notice.retry ? (
-                  <button
-                    type="button"
-                    aria-label="Try again"
-                    onClick={() => {
-                      void run(notice.retry!);
-                    }}
-                  >
-                    ↻
-                  </button>
-                ) : null}
-              </NoticeSurface>
-            ) : null}
-
-            {state.phase === "done"
-            && route === "factual"
-            && state.answer.shape === "factual" ? (
-              <div className="answer-float">
-                <FactualCard
-                  query={state.answer.query}
-                  app={state.answer.app}
-                  tier={state.answer.tier}
-                  onOpen={(trackId) => {
-                    void openById(trackId, null);
+                <SearchComposer
+                  value={text}
+                  onChange={onType}
+                  onSubmit={submit}
+                  onClear={() => {
+                    reset();
+                    setText("");
+                    setDetail(null);
+                    floor.current?.ghost(null);
                   }}
+                  busy={busy}
                 />
-              </div>
-            ) : null}
 
-            {state.phase === "done"
-            && route === "comparative"
-            && state.answer.shape === "comparative" ? (
-              <div className="answer-float">
-                <ComparativeList
-                  rows={state.answer.rows}
-                  tier={state.answer.tier}
-                />
+                <div className="indexed-line">
+                  <StoreMark size={13} />
+                  <span>
+                    {indexed.toLocaleString()}
+                    {" "}
+                    apps indexed
+                  </span>
+                </div>
+
+                {discoveryTier
+                && matches.length > 0 ? (
+                  <p
+                    className="discovery-tier"
+                    title={`Match scores: ${discoveryTier}`}
+                  >
+                    <span className="jev-mark">Jev-powered</span>
+
+                    <span className="sr">
+                      Match scores are {discoveryTier}.
+                    </span>
+                  </p>
+                ) : null}
               </div>
-            ) : null}
-          </main>
-        </SearchPage>
+            </main>
+          </SearchPage>
+
+          {notice ? (
+            <NoticeSurface role="alert">
+              <p>{notice.message}</p>
+
+              {notice.retry ? (
+                <button
+                  type="button"
+                  aria-label="Try again"
+                  onClick={() => {
+                    void run(notice.retry!);
+                  }}
+                >
+                  ↻
+                </button>
+              ) : null}
+            </NoticeSurface>
+          ) : null}
+
+          {state.phase === "done"
+          && route === "factual"
+          && state.answer.shape === "factual" ? (
+            <div className="answer-float backdrop-blur-[48px] backdrop-saturate-[1.7]">
+              <FactualCard
+                query={state.answer.query}
+                app={state.answer.app}
+                tier={state.answer.tier}
+                onOpen={(trackId) => {
+                  void openById(trackId, null);
+                }}
+              />
+            </div>
+          ) : null}
+
+          {state.phase === "done"
+          && route === "comparative"
+          && state.answer.shape === "comparative" ? (
+            <div className="answer-float backdrop-blur-[48px] backdrop-saturate-[1.7]">
+              <ComparativeList
+                rows={state.answer.rows}
+                tier={state.answer.tier}
+              />
+            </div>
+          ) : null}
+        </>
       )}
 
       <SponsorRails

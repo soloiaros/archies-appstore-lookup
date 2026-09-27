@@ -36,8 +36,6 @@ export function HereNow() {
 
   return (
     <p className="here-now">
-      <span className="here-dot" aria-hidden />
-
       <span>
         {here === null ? "…" : here.toLocaleString("en-US")}
         {" "}
