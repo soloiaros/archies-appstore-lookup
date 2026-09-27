@@ -1,3 +1,5 @@
+import { refreshIndexCount } from "../lib/catalog/index-count";
+
 import { ensureSchema, fromD1, type D1Database } from "../lib/site/d1";
 
 import { Presence } from "../lib/site/presence-do";
@@ -14,6 +16,8 @@ type FetchHandler = (
 
 type Bindings = {
   SITE_DB?: D1Database;
+
+  CATALOG_DB?: D1Database;
 };
 
 const token = {};
@@ -60,8 +64,18 @@ export default {
 
     const sql = fromD1(env.SITE_DB);
 
-    ctx.waitUntil(
-      ensureSchema(sql, token).then(() => releaseExpired(sql)),
-    );
+    const catalog = env.CATALOG_DB
+      ? fromD1(env.CATALOG_DB)
+      : null;
+
+    ctx.waitUntil((async () => {
+      await ensureSchema(sql, token);
+
+      await releaseExpired(sql);
+
+      if (catalog) {
+        await refreshIndexCount(sql, catalog);
+      }
+    })());
   },
 };
