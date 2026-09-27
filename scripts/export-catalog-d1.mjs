@@ -22,15 +22,15 @@ function sqlValue(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
-function insert(table, columns, rows) {
+function insert(table, columns, rows, batchSize = 20) {
   const lines = [
     `create table if not exists ${table} (${columns.map((column) => `${column.name} ${column.type}`).join(", ")});`,
   ];
 
   const names = columns.map((column) => column.name);
 
-  for (let index = 0; index < rows.length; index += 20) {
-    const batch = rows.slice(index, index + 20);
+  for (let index = 0; index < rows.length; index += batchSize) {
+    const batch = rows.slice(index, index + batchSize);
 
     const values = batch.map((row) => (
       `(${names.map((name) => sqlValue(row[name])).join(", ")})`
@@ -42,6 +42,35 @@ function insert(table, columns, rows) {
   }
 
   return lines;
+}
+
+if (process.argv.includes("icons")) {
+  const icons = db.prepare(`
+    select track_id, tier, method, model, vector
+    from icon_embeddings
+  `).all();
+
+  const encoded = icons.map((row) => ({
+    track_id: row.track_id,
+    tier: row.tier,
+    method: row.method,
+    model: row.model,
+    vector: Buffer.from(row.vector).toString("base64"),
+  }));
+
+  const sql = insert("icon_embeddings", [
+    { name: "track_id", type: "integer primary key" },
+    { name: "tier", type: "text" },
+    { name: "method", type: "text" },
+    { name: "model", type: "text" },
+    { name: "vector", type: "text" },
+  ], encoded, 10).join("\n");
+
+  writeFileSync("/tmp/catalog-icons.sql", sql);
+
+  console.log("icons", encoded.length, "bytes", sql.length);
+
+  process.exit(0);
 }
 
 const vectorsOnly = process.argv.includes("vectors");
