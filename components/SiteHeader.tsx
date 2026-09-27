@@ -8,6 +8,8 @@ import { usePathname } from "next/navigation";
 
 import { Key } from "@/components/ui/Key";
 
+import { VisitorPill } from "@/components/VisitorPill";
+
 import { playButtonSound } from "@/lib/sounds";
 
 const NAV = [
@@ -18,6 +20,14 @@ const NAV = [
   {
     href: "/how-to-use",
     label: "How to use",
+  },
+  {
+    href: "/stats",
+    label: "Stats",
+  },
+  {
+    href: "/sponsor",
+    label: "Sponsor",
   },
 ] as const;
 
@@ -143,6 +153,10 @@ export function SiteHeader() {
                 );
               })}
             </nav>
+          </div>
+
+          <div className="site-header-end">
+            <VisitorPill />
           </div>
         </div>
       </header>

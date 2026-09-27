@@ -31,6 +31,8 @@ import { NoticeSurface } from "@/components/NoticeSurface";
 
 import { SearchComposer } from "@/components/SearchComposer";
 
+import { SponsorRails } from "@/components/SponsorRails";
+
 import { StoreMark } from "@/components/ui/StoreMark";
 
 import type { MatchPick } from "@/components/floor/overlays";
@@ -40,6 +42,8 @@ import type { Sheet } from "@/components/floor/atlas";
 import { useQuery } from "@/hooks/useQuery";
 
 import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
+
+import type { SlotView } from "@/lib/site/types";
 
 import { useRoute } from "@/hooks/useRoute";
 
@@ -55,12 +59,18 @@ export function QueryScreen({
   icons,
   indexed,
   sheet,
+  slots,
+  priceLabel,
 }: {
   icons: PileIcon[];
 
   indexed: number;
 
   sheet: Sheet | null;
+
+  slots: SlotView[];
+
+  priceLabel: string;
 }) {
   const [pileIcons] = useState(() => icons);
 
@@ -528,6 +538,11 @@ export function QueryScreen({
               </div>
             ) : null}
           </main>
+
+          <SponsorRails
+            slots={slots}
+            priceLabel={priceLabel}
+          />
         </SearchPage>
       )}
     </>
