@@ -475,7 +475,11 @@ export function QueryScreen({
             >
               {outputShown ? null : (
                 <div className="stage-head">
-                  <h1>Describe an app</h1>
+                  <h1>Name an app feature.</h1>
+
+                  <p className="stage-sub">
+                    Get all matching apps on the AppStore.
+                  </p>
 
                   <LiveStats />
                 </div>

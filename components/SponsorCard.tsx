@@ -102,7 +102,6 @@ function OpenFace({
   size,
   priceLabel,
   inert,
-  alt,
 }: {
   slotId: number | null;
 
@@ -111,8 +110,6 @@ function OpenFace({
   priceLabel: string;
 
   inert?: boolean;
-
-  alt?: boolean;
 }) {
   return (
     <button
@@ -125,18 +122,14 @@ function OpenFace({
         openSponsor(slotId);
       }}
     >
-      <span className="sponsor-kicker">
-        {alt ? "Your app here" : "Open slot"}
-      </span>
+      <span className="sponsor-kicker">Open slot</span>
 
       <strong>
         {priceLabel}
         <span>/30 days</span>
       </strong>
 
-      <span className="sponsor-cta">
-        {alt ? "seen by devs on Search →" : "put your product here →"}
-      </span>
+      <span className="sponsor-cta">put your product here →</span>
     </button>
   );
 }
@@ -216,8 +209,6 @@ export function SponsorFlip({
 }) {
   const backUp = turn % 2 === 1;
 
-  const open = slot.status === "open";
-
   return (
     <div className={`sponsor-flip sponsor-flip-${size}`}>
       <div
@@ -245,12 +236,11 @@ export function SponsorFlip({
           aria-hidden={!backUp}
           inert={!backUp}
         >
-          <OpenFace
-            slotId={open ? slot.id : null}
+          <Front
+            slot={slot}
             size={size}
             priceLabel={priceLabel}
             inert={!backUp}
-            alt={open}
           />
         </div>
       </div>
