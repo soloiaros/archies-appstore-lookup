@@ -4,8 +4,6 @@ import { sqliteCatalog } from "@/lib/catalog/sqlite";
 
 import { answerComparative } from "@/lib/router/comparative";
 
-import { answerDiscovery } from "@/lib/router/discovery";
-
 import { answerFactual } from "@/lib/router/factual";
 
 import { classify } from "@/lib/router/classify";
@@ -35,6 +33,10 @@ export async function answer(
         catalog,
       );
     }
+
+    const { answerDiscovery } = await import(
+      "@/lib/router/discovery"
+    );
 
     return await answerDiscovery(
       query,
