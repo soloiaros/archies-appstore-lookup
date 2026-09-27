@@ -54,7 +54,14 @@ export async function ensureSchema(
     return;
   }
 
-  await sql.exec(SCHEMA);
+  const statements = SCHEMA
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+
+  for (const statement of statements) {
+    await sql.exec(`${statement};`);
+  }
 
   ready.add(token);
 }

@@ -36,7 +36,7 @@ export async function underLimit(
 
     return hits <= limit;
   } catch {
-    return false;
+    return true;
   }
 }
 
