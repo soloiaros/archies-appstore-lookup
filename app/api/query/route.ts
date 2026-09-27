@@ -37,7 +37,22 @@ export async function POST(
     );
   }
 
-  const result = await answer(query);
+  try {
+    const result = await answer(query);
 
-  return Response.json(result);
+    return Response.json(result);
+  } catch (error) {
+    const raw = error instanceof Error
+      ? error.message
+      : "Query failed.";
+
+    const message = raw === "Illegal constructor"
+      ? "The app catalog is not available on this server."
+      : raw;
+
+    return Response.json(
+      { error: message },
+      { status: 500 },
+    );
+  }
 }
