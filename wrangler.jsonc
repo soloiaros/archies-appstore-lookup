@@ -18,7 +18,7 @@
     {
       "binding": "SITE_DB",
       "database_name": "site",
-      "database_id": "00000000-0000-0000-0000-000000000001"
+      "database_id": "245cac40-60d4-4831-8b0c-8f901de94ae2"
     }
   ],
   "durable_objects": {
