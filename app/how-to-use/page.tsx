@@ -5,44 +5,49 @@ import { SectionPage } from "@/components/DirectionalPage";
 const ASKS = [
   {
     title: "Describe a feature",
-    body: "Say what it does, or what the icon looks like. Apps scored at 30% or higher stay, with the score beside each one.",
     example: "habit tracker with streaks",
   },
   {
-    title: "Name one app",
-    body: "A short name, or a question about rating or price, returns that app and its stored fields.",
+    title: "Name an app",
     example: "Duolingo rating",
   },
   {
     title: "Compare",
-    body: "Words such as vs, compare, faster, or growing return a list ordered by stored momentum.",
     example: "Notion vs Obsidian",
   },
 ] as const;
 
-const READ = [
+const PIPE = [
   {
-    title: "Open a match",
-    body: "Click an icon in the pile to open the app: revenue estimate, ratings, screenshots, and tags.",
+    title: "Index",
+    body: "US App Store charts from Apple's feeds, refreshed daily.",
   },
   {
-    title: "Read the mark",
-    body: "Every number is verified, estimated, or unavailable. Estimates carry the method that produced them.",
+    title: "Route",
+    body: "Your query is sorted: one app, a comparison, or a feature.",
+  },
+  {
+    title: "Retrieve",
+    body: "Up to 120 candidates by meaning, icon look, tags, and name.",
+  },
+  {
+    title: "Score",
+    body: "Jev rates each one. 30% and up stays on the pile.",
   },
 ] as const;
 
 const KEYS = [
   {
     key: "/",
-    label: "focus the field",
+    label: "focus",
   },
   {
     key: "Return",
-    label: "run the search",
+    label: "search",
   },
   {
     key: "Esc",
-    label: "clear it",
+    label: "clear",
   },
 ] as const;
 
@@ -54,59 +59,59 @@ export default function HowToUsePage() {
           <div>
             <p className="board-kicker">How to use</p>
 
-            <h1>Ask in plain language.</h1>
-
-            <p className="board-lede">
-              Describe a feature, name an app, or compare a few. The index
-              is the US App Store charts, and a sentence is enough.
-            </p>
+            <h1>One field. Plain words.</h1>
           </div>
+
+          <Link
+            className="ui-key sponsor-submit"
+            href="/search"
+            transitionTypes={["section"]}
+          >
+            Open Search
+          </Link>
         </header>
 
         <section
           className="board-block"
           aria-labelledby="ask-title"
         >
-          <div className="board-block-head">
-            <h2 id="ask-title">Three ways to ask</h2>
+          <h2 id="ask-title">Ask</h2>
 
-            <p>one field, one sentence</p>
-          </div>
-
-          <ol className="step-grid">
-            {ASKS.map((ask, at) => (
+          <ul className="ask-list">
+            {ASKS.map((ask) => (
               <li key={ask.title}>
-                <span className="step-num">
-                  {String(at + 1).padStart(2, "0")}
-                </span>
+                <span>{ask.title}</span>
 
-                <strong>{ask.title}</strong>
-
-                <p>{ask.body}</p>
-
-                <code className="ask-example">{ask.example}</code>
+                <code>{ask.example}</code>
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
 
         <section
           className="board-block"
-          aria-labelledby="read-title"
+          aria-labelledby="hood-title"
         >
-          <div className="board-block-head">
-            <h2 id="read-title">Reading the answer</h2>
-          </div>
+          <h2 id="hood-title">Under the hood</h2>
 
-          <ul className="step-grid step-grid-two">
-            {READ.map((item) => (
-              <li key={item.title}>
-                <strong>{item.title}</strong>
+          <ol className="pipe">
+            {PIPE.map((step, at) => (
+              <li key={step.title}>
+                <span className="step-num">
+                  {String(at + 1).padStart(2, "0")}
+                </span>
 
-                <p>{item.body}</p>
+                <strong>{step.title}</strong>
+
+                <p>{step.body}</p>
               </li>
             ))}
-          </ul>
+          </ol>
+
+          <p className="pipe-note">
+            Revenue is estimated from top-grossing rank. Every number is
+            marked verified, estimated, or unavailable, never guessed.
+          </p>
         </section>
 
         <section className="stat-row key-row" aria-label="Keyboard">
@@ -117,23 +122,6 @@ export default function HowToUsePage() {
               <span>{item.label}</span>
             </div>
           ))}
-        </section>
-
-        <section className="fine-print">
-          <h2>A blank field stays blank.</h2>
-
-          <p>
-            The index comes from Apple&apos;s public feeds. Downloads and
-            monthly users stay empty unless a method is stored with the
-            number. US store spend, when shown, is an estimate from chart
-            rank and is marked estimated.
-          </p>
-
-          <p>
-            <Link className="ui-key sponsor-submit" href="/search" transitionTypes={["section"]}>
-              Open Search
-            </Link>
-          </p>
         </section>
       </main>
     </SectionPage>
