@@ -244,10 +244,18 @@ html:has(.search-lock) body {
 .answer-float {
   pointer-events: auto;
   position: fixed;
+  z-index: 48;
   left: 50%;
   top: calc(50% + 58px);
   transform: translateX(-50%);
-  width: min(620px, calc(100vw - 40px));
+  width: min(520px, calc(100vw - 120px));
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 16px;
+  background: var(--frost-bg);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 28px 64px -28px rgb(0 0 0 / 0.88);
 }
 
 .notice-float {
@@ -256,9 +264,8 @@ html:has(.search-lock) body {
   gap: 1rem;
   box-sizing: border-box;
   padding: 0.65rem 0.65rem 0.65rem 1.5rem;
-  border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: 16px;
-  background: #1d1d1d;
+  background: transparent;
 }
 
 .notice-float p {
@@ -287,9 +294,8 @@ html:has(.search-lock) body {
 .panel-frame {
   position: relative;
   box-sizing: border-box;
-  border: 1px solid rgb(255 255 255 / 0.1);
   border-radius: 16px;
-  background: #1d1d1d;
+  background: transparent;
   overflow: hidden;
 }
 
@@ -967,10 +973,13 @@ ol {
 }
 
 @media (max-width: 720px) {
-  .stage-bar,
+  .stage-bar {
+    width: min(100vw - 24px, 620px);
+  }
+
   .notice-beam,
   .answer-float {
-    width: min(100vw - 24px, 620px);
+    width: min(100vw - 96px, 520px);
   }
 
   .composer {
@@ -2301,6 +2310,7 @@ button.home-footer-link {
 }
 
 :root {
+  --frost-bg: rgb(16 16 18 / 0.58);
   --gold: #f5c542;
   --slot-tile-w: 168px;
   --slot-tile-h: 132px;
@@ -2421,20 +2431,16 @@ button.home-footer-link {
   font-size: 13px;
 }
 
-.here-dot {
-  flex: none;
-  width: 0.42rem;
-  height: 0.42rem;
+.jev-mark {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  background: #3ddc84;
-  box-shadow: 0 0 0 3px rgb(61 220 132 / 0.16);
-  animation: here-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes here-pulse {
-  50% {
-    box-shadow: 0 0 0 5px rgb(61 220 132 / 0.06);
-  }
+  background: var(--neo-well);
+  box-shadow: var(--neo-sink);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
 }
 
 /* sponsor slots */
@@ -3836,7 +3842,6 @@ button.home-footer-link {
     pointer-events: auto;
   }
 
-  .here-dot,
   .sponsor-modal[open] {
     animation: none;
   }
