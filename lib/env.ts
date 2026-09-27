@@ -1,15 +1,23 @@
 import { readFileSync } from "node:fs";
 
-export function loadLocalEnv(): void {
-  for (const name of [".env.local", ".env"]) {
-    let text = "";
+function readDotEnv(name: ".env.local" | ".env") {
+  try {
+    return readFileSync(
+      /*turbopackIgnore: true*/ name,
+      "utf8",
+    );
+  } catch {
+    return null;
+  }
+}
 
-    try {
-      text = readFileSync(
-        name,
-        "utf8",
-      );
-    } catch {
+export function loadLocalEnv(): void {
+  if (process.env.NODE_ENV === "production") {
+    return;
+  }
+
+  for (const text of [readDotEnv(".env.local"), readDotEnv(".env")]) {
+    if (text == null) {
       continue;
     }
 
