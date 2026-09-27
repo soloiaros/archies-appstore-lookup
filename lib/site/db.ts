@@ -12,12 +12,24 @@ type PresenceNamespace = {
   };
 };
 
+export type WorkersAi = {
+  run(
+    model: string,
+    input: {
+      text: string[];
+      pooling?: "mean" | "cls";
+    },
+  ): Promise<{ data?: unknown }>;
+};
+
 type CfEnv = {
   SITE_DB?: D1Database;
 
   CATALOG_DB?: D1Database;
 
   PRESENCE?: PresenceNamespace;
+
+  AI?: WorkersAi;
 };
 
 const d1Token = {};
@@ -65,6 +77,12 @@ export async function siteDb(): Promise<SiteSql> {
   }
 
   return sqliteSite();
+}
+
+export async function workersAi(): Promise<WorkersAi | null> {
+  const env = await cloudflareEnv();
+
+  return env?.AI ?? null;
 }
 
 export async function catalogDb(): Promise<SiteSql | null> {
