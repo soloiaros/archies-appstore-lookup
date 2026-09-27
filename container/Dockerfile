@@ -12,8 +12,6 @@ ENV HF_HOME=/app/.cache
 
 ENV TRANSFORMERS_CACHE=/app/.cache
 
-RUN node server.mjs --warmup
-
 EXPOSE 8788
 
 CMD ["node", "server.mjs"]
