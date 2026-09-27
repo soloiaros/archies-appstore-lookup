@@ -5,8 +5,10 @@ const nextConfig: NextConfig = {
 
   serverExternalPackages: [
     "@huggingface/transformers",
+    "@opennextjs/cloudflare",
     "onnxruntime-node",
     "sharp",
+    "wrangler",
   ],
 
   async redirects() {

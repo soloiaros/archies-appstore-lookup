@@ -33,4 +33,9 @@ next-env.d.ts
 !/data/snapshots/.gitkeep
 /data/catalog.sqlite
 /data/catalog.sqlite-*
+/data/site.sqlite
+/data/site.sqlite-*
 /data/icons/
+
+.open-next/
+.wrangler/
