@@ -52,10 +52,33 @@ export function loadLocalEnv(): void {
   }
 }
 
+function boundKey(): string | null {
+  const ctx = (globalThis as {
+    [key: symbol]: { env?: Record<string, unknown> } | undefined;
+  })[Symbol.for("__cloudflare-context__")];
+
+  const env = ctx?.env;
+
+  if (!env) {
+    return null;
+  }
+
+  for (const name of ["OPENROUTER_API_KEY", "TYPE_SAFE_KEY"]) {
+    const value = env[name];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
 export function typesafeKey(): string | null {
   const key =
     process.env.OPENROUTER_API_KEY
-    || process.env.TYPE_SAFE_KEY;
+    || process.env.TYPE_SAFE_KEY
+    || boundKey();
 
   if (!key || key.trim() === "") {
     return null;

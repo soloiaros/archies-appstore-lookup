@@ -14,6 +14,11 @@ import type { IndexedApp } from "@/lib/retrieve/memory";
 
 import { warmIndex } from "@/lib/retrieve/memory";
 
+import {
+  queryMentionsColor,
+  queryMentionsLetters,
+} from "@/lib/retrieve/cues";
+
 import type { Finalist } from "@/lib/types";
 
 const BY_MEANING = 40;
@@ -30,15 +35,6 @@ const FINALIST_CAP = 120;
 
 const DEEPEN_CAP = 60;
 
-const COLOR_WORD =
-  /\b(red|orange|yellow|green|blue|purple|violet|pink|brown|black|white|gr[ae]y|beige|cream|teal|cyan|navy|lime|gold|silver|magenta|maroon|turquoise|indigo|dark|light|bright|pastel|neon|colou?r\w*)\b/i;
-
-const LETTER_WORDS = new Set(
-  "letter letters text texts word words writing written write say says saying spelled printed reads read".split(
-    " ",
-  ),
-);
-
 type TagDef = {
   id: string;
 
@@ -47,19 +43,10 @@ type TagDef = {
 
 let tagDefs: TagDef[] | null = null;
 
-export function queryMentionsColor(
-  query: string,
-): boolean {
-  return COLOR_WORD.test(query);
-}
-
-export function queryMentionsLetters(
-  query: string,
-): boolean {
-  return tokenize(query).some((word) =>
-    LETTER_WORDS.has(word),
-  );
-}
+export {
+  queryMentionsColor,
+  queryMentionsLetters,
+} from "@/lib/retrieve/cues";
 
 export async function retrieveFinalists(
   _db: DatabaseSync,

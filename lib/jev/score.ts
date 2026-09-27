@@ -5,7 +5,7 @@ import { SCORE_INSTRUCTIONS } from "@/lib/jev/prompt";
 import {
   queryMentionsColor,
   queryMentionsLetters,
-} from "@/lib/retrieve/finalists";
+} from "@/lib/retrieve/cues";
 
 import type { Finalist } from "@/lib/types";
 
