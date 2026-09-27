@@ -473,17 +473,20 @@ export function QueryScreen({
               ref={bar}
               className="stage-bar"
             >
-              {outputShown ? null : (
-                <div className="stage-head">
-                  <h1>Name an app feature.</h1>
+              <div
+                className="stage-head"
+                data-hidden={outputShown ? "true" : "false"}
+                aria-hidden={outputShown || undefined}
+                inert={outputShown || undefined}
+              >
+                <h1>Name an app feature.</h1>
 
-                  <p className="stage-sub">
-                    Get all matching apps on the AppStore.
-                  </p>
+                <p className="stage-sub">
+                  Get all matching apps on the AppStore.
+                </p>
 
-                  <LiveStats />
-                </div>
-              )}
+                <LiveStats />
+              </div>
 
               <SearchComposer
                 value={text}

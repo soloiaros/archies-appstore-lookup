@@ -6,6 +6,7 @@ import {
   useState,
   ViewTransition,
   type ReactElement,
+  type ReactNode,
 } from "react";
 
 import { DirectionalPage } from "@/components/DirectionalPage";
@@ -15,6 +16,8 @@ import { ProvenanceMark } from "@/components/ProvenanceMark";
 import { formatRevenueBand } from "@/lib/catalog/revenue";
 
 import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
+
+import type { ProvenanceTier, Reading } from "@/models/provenance";
 
 export function iconTransitionName(
   trackId: number,
@@ -74,6 +77,31 @@ export function TitleMorph({
   );
 }
 
+type Shown = {
+  value: string;
+
+  tier: ProvenanceTier;
+
+  method?: string;
+};
+
+function show<T>(
+  reading: Reading<T>,
+  format: (value: T) => string,
+): Shown {
+  if (reading.tier === "unavailable") {
+    return { value: "—", tier: "unavailable" };
+  }
+
+  return {
+    value: format(reading.value),
+    tier: reading.tier,
+    method: reading.tier === "estimated" ? reading.method : undefined,
+  };
+}
+
+const text = (value: string) => value;
+
 export function AppDetail({
   detail,
   onBack,
@@ -99,243 +127,264 @@ export function AppDetail({
     };
   }, [onBack]);
 
+  const revenue = show(detail.revenue, formatRevenueBand);
+
+  const mrr = show(detail.mrr, text);
+
+  const arr = show(detail.arr, text);
+
+  const downloads = show(detail.downloads, text);
+
+  const momentum = show(detail.momentum, (value) => value.toLocaleString("en-US"));
+
+  const rating = detail.rating.average;
+
   return (
     <DirectionalPage>
       <div className="app-detail">
-        <button
-          type="button"
-          className="app-detail-back"
-          onClick={onBack}
-          style={{ viewTransitionName: "detail-back" }}
-        >
-          ← Search
-        </button>
-
-        <div className="app-detail-hero-wrap">
-          <IconMorph
-            trackId={detail.trackId}
-            onSettled={onFlightEnd}
+        <div className="app-page">
+          <button
+            type="button"
+            className="ui-key app-detail-back"
+            onClick={onBack}
+            style={{ viewTransitionName: "detail-back" }}
           >
-            <img
-              className="app-detail-hero"
-              src={detail.iconUrl}
-              alt=""
-              draggable={false}
+            ← Search
+          </button>
+
+          <header className="app-hero">
+            <div className="app-detail-hero-wrap">
+              <IconMorph
+                trackId={detail.trackId}
+                onSettled={onFlightEnd}
+              >
+                <img
+                  className="app-detail-hero"
+                  src={detail.iconUrl}
+                  alt=""
+                  draggable={false}
+                />
+              </IconMorph>
+            </div>
+
+            <div className="app-hero-copy">
+              <TitleMorph trackId={detail.trackId}>
+                <h1>{detail.name}</h1>
+              </TitleMorph>
+
+              <p className="app-hero-seller">{detail.sellerName}</p>
+
+              <p className="app-chips">
+                <span>{detail.primaryGenre}</span>
+
+                <span>{detail.formattedPrice}</span>
+
+                {detail.matchProbability !== null ? (
+                  <span>
+                    {Math.round(detail.matchProbability * 100)}
+                    % match
+                  </span>
+                ) : null}
+
+                {detail.delisted ? <span>Delisted</span> : null}
+              </p>
+            </div>
+
+            <a
+              className="ui-key sponsor-submit app-store-link"
+              href={detail.storeUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              App Store ↗
+            </a>
+          </header>
+
+          <section className="app-stats" aria-label="Key numbers">
+            <Stat
+              label="Rating"
+              tier={detail.rating.tier}
+              value={
+                rating !== null ? (
+                  <>
+                    <span className="app-star" aria-hidden>★</span>
+                    {rating.toFixed(1)}
+                  </>
+                ) : "—"
+              }
+              note={
+                detail.rating.count !== null
+                  ? `${detail.rating.count.toLocaleString("en-US")} ratings`
+                  : undefined
+              }
             />
-          </IconMorph>
-        </div>
 
-        <div className="app-detail-copy">
-          <TitleMorph trackId={detail.trackId}>
-            <h1>{detail.name}</h1>
-          </TitleMorph>
+            <Stat
+              label="US spend / day"
+              tier={revenue.tier}
+              value={revenue.value}
+              note={revenue.method}
+            />
 
-          <p className="app-detail-mono">
-            {detail.sellerName}
-          </p>
+            <Stat
+              label="MRR"
+              tier={mrr.tier}
+              value={mrr.value}
+              note={mrr.method}
+            />
 
-          <p className="app-detail-meta">
-            {detail.primaryGenre}
-            {" · "}
-            {detail.formattedPrice}
+            <Stat
+              label="ARR"
+              tier={arr.tier}
+              value={arr.value}
+              note={arr.method}
+            />
+          </section>
 
-            {detail.matchProbability !== null ? (
-              <>
-                {" · "}
-                {Math.round(detail.matchProbability * 100)}
-                %
-              </>
+          <section className="app-substats" aria-label="More numbers">
+            <MiniStat label="Downloads / mo" shown={downloads} />
+
+            <MiniStat label="Momentum" shown={momentum} />
+
+            <MiniStat
+              label="Released"
+              shown={{ value: formatDate(detail.releaseDate), tier: "verified" }}
+            />
+
+            <MiniStat
+              label="Updated"
+              shown={{
+                value: formatDate(detail.currentVersionReleaseDate),
+                tier: "verified",
+              }}
+            />
+          </section>
+
+          {detail.screenshotUrls.length > 0 ? (
+            <section className="app-block" aria-label="Screenshots">
+              <Shots urls={detail.screenshotUrls} />
+            </section>
+          ) : null}
+
+          <section className="app-block" aria-labelledby="about-title">
+            <h2 id="about-title">About</h2>
+
+            <About text={detail.description} />
+          </section>
+
+          <section className="app-block" aria-labelledby="facts-title">
+            <h2 id="facts-title">Details</h2>
+
+            <dl className="app-facts">
+              <Fact label="Seller">{detail.sellerName}</Fact>
+
+              {detail.genres.length > 0 ? (
+                <Fact label="Genres">{detail.genres.join(", ")}</Fact>
+              ) : null}
+
+              <Fact label="Version">{detail.version || "—"}</Fact>
+
+              <Fact label="Age rating">{detail.contentAdvisoryRating || "—"}</Fact>
+
+              {detail.signals ? (
+                <Fact label="Icon colour">{detail.signals.colorText || "—"}</Fact>
+              ) : null}
+
+              <Fact label="Fetched">{formatDate(detail.metadataFetchedAt)}</Fact>
+
+              <Fact label="Bundle" wide>
+                <span className="app-card-mono">{detail.bundleId}</span>
+              </Fact>
+            </dl>
+
+            {detail.tags.length > 0 ? (
+              <p className="app-card-tags">
+                {detail.tags.map((tag) => (
+                  <span
+                    key={tag.tagId}
+                    className="app-card-tag"
+                  >
+                    {tag.tagId}
+                  </span>
+                ))}
+              </p>
             ) : null}
-          </p>
-
-          <DetailFields detail={detail} />
+          </section>
         </div>
       </div>
     </DirectionalPage>
   );
 }
 
-function DetailFields({
-  detail,
+function Stat({
+  label,
+  value,
+  tier,
+  note,
 }: {
-  detail: AppRecord;
+  label: string;
+
+  value: ReactNode;
+
+  tier: ProvenanceTier;
+
+  note?: string;
 }) {
   return (
-    <dl className="app-card-fields">
-      {detail.screenshotUrls.length > 0 ? (
-        <Field label="Screens">
-          <Shots urls={detail.screenshotUrls} />
-        </Field>
+    <div className="app-stat">
+      <div className="app-stat-head">
+        <span>{label}</span>
+
+        <ProvenanceMark tier={tier} />
+      </div>
+
+      <strong>{value}</strong>
+
+      {note ? (
+        <p title={note}>{note}</p>
       ) : null}
+    </div>
+  );
+}
 
-      <Field label="Store">
-        <a
-          href={detail.storeUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Open in App Store
-        </a>
-      </Field>
+function MiniStat({
+  label,
+  shown,
+}: {
+  label: string;
 
-      <Field label="About">
-        <About text={detail.description} />
-      </Field>
+  shown: Shown;
+}) {
+  return (
+    <div className="app-mini" title={shown.method}>
+      <span>{label}</span>
 
-      <Field label="Seller">
-        {detail.sellerName}
-      </Field>
+      <strong>{shown.value}</strong>
 
-      {detail.genres.length > 0 ? (
-        <Field label="Genres">
-          {detail.genres.join(", ")}
-        </Field>
+      {shown.tier !== "verified" ? (
+        <ProvenanceMark tier={shown.tier} />
       ) : null}
+    </div>
+  );
+}
 
-      <Field label="Price">
-        {detail.formattedPrice}
-      </Field>
+function Fact({
+  label,
+  wide,
+  children,
+}: {
+  label: string;
 
-      <Field label="Released">
-        {formatDate(detail.releaseDate)}
-      </Field>
+  wide?: boolean;
 
-      <Field label="Updated">
-        {formatDate(
-          detail.currentVersionReleaseDate,
-        )}
-      </Field>
+  children: ReactNode;
+}) {
+  return (
+    <div className={wide ? "app-fact app-fact-wide" : "app-fact"}>
+      <dt>{label}</dt>
 
-      <Field label="Rating">
-        {detail.rating.average !== null ? (
-          <span>
-            {detail.rating.average.toFixed(1)}
-            {" ("}
-            {detail.rating.count?.toLocaleString()}
-            {")"}
-          </span>
-        ) : (
-          <span>—</span>
-        )}
-      </Field>
-
-      <Field label="Momentum">
-        {detail.momentum.tier === "estimated" ? (
-          <span>{detail.momentum.value}</span>
-        ) : (
-          <span>—</span>
-        )}
-      </Field>
-
-      <Field label="Monthly downloads">
-        <ProvenanceMark
-          tier={detail.downloads.tier}
-          method={
-            detail.downloads.tier === "estimated"
-              ? detail.downloads.method
-              : undefined
-          }
-        />
-        {detail.downloads.tier === "estimated" ? (
-          <span>
-            {" "}
-            {detail.downloads.value}
-          </span>
-        ) : null}
-      </Field>
-
-      <Field label="US store spend / day">
-        <ProvenanceMark
-          tier={detail.revenue.tier}
-          method={
-            detail.revenue.tier === "estimated"
-              ? detail.revenue.method
-              : undefined
-          }
-        />
-        {detail.revenue.tier === "estimated" ? (
-          <span>
-            {" "}
-            {formatRevenueBand(detail.revenue.value)}
-          </span>
-        ) : null}
-      </Field>
-
-      <Field label="MRR">
-        <ProvenanceMark
-          tier={detail.mrr.tier}
-          method={
-            detail.mrr.tier === "estimated"
-              ? detail.mrr.method
-              : undefined
-          }
-        />
-        {detail.mrr.tier === "estimated" ? (
-          <span>
-            {" "}
-            {detail.mrr.value}
-          </span>
-        ) : null}
-      </Field>
-
-      <Field label="ARR">
-        <ProvenanceMark
-          tier={detail.arr.tier}
-          method={
-            detail.arr.tier === "estimated"
-              ? detail.arr.method
-              : undefined
-          }
-        />
-        {detail.arr.tier === "estimated" ? (
-          <span>
-            {" "}
-            {detail.arr.value}
-          </span>
-        ) : null}
-      </Field>
-
-      <Field label="Age rating">
-        {detail.contentAdvisoryRating}
-      </Field>
-
-      <Field label="Bundle">
-        <span className="app-card-mono">
-          {detail.bundleId}
-        </span>
-      </Field>
-
-      {detail.delisted ? (
-        <Field label="Status">
-          Delisted
-        </Field>
-      ) : null}
-
-      {detail.signals ? (
-        <Field label="Icon color">
-          {detail.signals.colorText || "—"}
-        </Field>
-      ) : null}
-
-      {detail.tags.length > 0 ? (
-        <Field label="Tags">
-          <span className="app-card-tags">
-            {detail.tags.map((tag) => (
-              <span
-                key={tag.tagId}
-                className="app-card-tag"
-              >
-                {tag.tagId}
-              </span>
-            ))}
-          </span>
-        </Field>
-      ) : null}
-
-      <Field label="Fetched">
-        {formatDate(detail.metadataFetchedAt)}
-      </Field>
-    </dl>
+      <dd>{children}</dd>
+    </div>
   );
 }
 
@@ -436,31 +485,15 @@ function About({
       {overflows ? (
         <button
           type="button"
-          className="app-card-more"
+          className="text-button app-card-more"
           onClick={() => {
             setOpen((value) => !value);
           }}
         >
-          {open ? "Less" : "More"}
+          {open ? "Show less" : "Show more"}
         </button>
       ) : null}
     </>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="app-card-field">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
   );
 }
 
@@ -478,7 +511,7 @@ function formatDate(
   }
 
   return date.toLocaleDateString(
-    undefined,
+    "en-US",
     {
       year: "numeric",
       month: "short",
