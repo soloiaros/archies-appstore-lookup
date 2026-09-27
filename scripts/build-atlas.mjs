@@ -187,6 +187,10 @@ await sheet
   .webp({ lossless: true, effort: 6 })
   .toFile(path.join(out, "pile.webp"));
 
+const indexed = db.prepare(
+  "select count(*) as n from apps where delisted = 0",
+).get().n;
+
 fs.writeFileSync(
   path.join(out, "pile.json"),
   JSON.stringify({
@@ -194,6 +198,7 @@ fs.writeFileSync(
     gutter: GUTTER,
     cols: COLS,
     sheet: "/atlas/pile.webp",
+    indexed,
     ids: chosen.map((i) => i.id),
     srcs: chosen.map((i) => i.full),
   }),
