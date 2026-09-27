@@ -25,6 +25,16 @@ create table if not exists pageviews (
 
 create index if not exists pageviews_ts on pageviews (ts);
 
+create table if not exists orders (
+  id text primary key,
+  slot_id integer not null,
+  email text not null,
+  created_at integer not null,
+  status text not null
+);
+
+create index if not exists orders_email on orders (email, status);
+
 insert or ignore into slots (
   id,
   kind,

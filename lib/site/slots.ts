@@ -4,7 +4,7 @@ import { releaseExpired } from "@/lib/site/sweep";
 
 import type { SlotRow, SlotView } from "@/lib/site/types";
 
-export const HOLD_MS = 35 * 60 * 1000;
+export const HOLD_MS = 72 * 60 * 60 * 1000;
 
 export const TERM_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -71,18 +71,14 @@ export function fallbackSlots(): SlotView[] {
   ];
 }
 
-async function rows() {
+export async function listSlots(): Promise<SlotView[]> {
   const sql = await siteDb();
 
   await releaseExpired(sql);
 
-  return sql.all<SlotRow>(
+  const list = await sql.all<SlotRow>(
     `${SLOT_SQL} order by id`,
   );
-}
-
-export async function listSlots(): Promise<SlotView[]> {
-  const list = await rows();
 
   if (list.length === 0) {
     return fallbackSlots();
@@ -91,19 +87,10 @@ export async function listSlots(): Promise<SlotView[]> {
   return list.map(view);
 }
 
-export async function readSlot(id: number): Promise<SlotRow | undefined> {
-  const sql = await siteDb();
+export type OrderInput = {
+  slotId: number | null;
 
-  await releaseExpired(sql);
-
-  return sql.get<SlotRow>(
-    `${SLOT_SQL} where id = ?`,
-    [id],
-  );
-}
-
-export type HoldInput = {
-  id: number;
+  email: string;
 
   name: string;
 
@@ -116,12 +103,17 @@ export type HoldInput = {
   color: string | null;
 };
 
-export async function holdSlot(input: HoldInput): Promise<boolean> {
+export type OrderResult =
+  | { ok: true; orderId: string; slotId: number; holdUntil: number }
+  | { ok: false; reason: "taken" | "busy" | "full" };
+
+async function tryHold(
+  slotId: number,
+  orderId: string,
+  input: OrderInput,
+  now: number,
+) {
   const sql = await siteDb();
-
-  const now = Date.now();
-
-  await releaseExpired(sql, now);
 
   const changes = await sql.run(
     `
@@ -135,16 +127,10 @@ export async function holdSlot(input: HoldInput): Promise<boolean> {
       color = ?,
       hold_until = ?,
       paid_until = null,
-      checkout_id = null
+      checkout_id = ?
     where id = ?
       and kind = 'sale'
-      and (
-        status = 'open'
-        or (
-          status = 'held'
-          and (hold_until is null or hold_until < ?)
-        )
-      )
+      and status = 'open'
     `,
     [
       input.name,
@@ -153,36 +139,73 @@ export async function holdSlot(input: HoldInput): Promise<boolean> {
       input.logoUrl,
       input.color,
       now + HOLD_MS,
-      input.id,
-      now,
+      orderId,
+      slotId,
     ],
   );
 
   return changes === 1;
 }
 
-export async function attachCheckout(
-  id: number,
-  checkoutId: string,
-) {
+export async function placeOrder(input: OrderInput): Promise<OrderResult> {
   const sql = await siteDb();
 
-  await sql.run(
+  const now = Date.now();
+
+  await releaseExpired(sql, now);
+
+  const pending = await sql.get<{ id: string }>(
     `
-    update slots
-    set checkout_id = ?
-    where id = ?
-      and kind = 'sale'
-      and status = 'held'
+    select orders.id
+    from orders
+    join slots on slots.checkout_id = orders.id
+    where orders.email = ?
+      and orders.status = 'pending'
+      and slots.status = 'held'
     `,
-    [checkoutId, id],
+    [input.email],
   );
+
+  if (pending) {
+    return { ok: false, reason: "busy" };
+  }
+
+  const orderId = crypto.randomUUID();
+
+  const candidates = input.slotId
+    ? [input.slotId]
+    : (await sql.all<{ id: number }>(
+      "select id from slots where kind = 'sale' and status = 'open' order by id",
+    )).map((row) => row.id);
+
+  for (const slotId of candidates) {
+    if (!await tryHold(slotId, orderId, input, now)) {
+      continue;
+    }
+
+    await sql.run(
+      `
+      insert into orders (id, slot_id, email, created_at, status)
+      values (?, ?, ?, ?, 'pending')
+      `,
+      [orderId, slotId, input.email, now],
+    );
+
+    return {
+      ok: true,
+      orderId,
+      slotId,
+      holdUntil: now + HOLD_MS,
+    };
+  }
+
+  return {
+    ok: false,
+    reason: input.slotId ? "taken" : "full",
+  };
 }
 
-export async function releaseHold(
-  id: number,
-  checkoutId?: string,
-) {
+export async function cancelOrder(orderId: string) {
   const sql = await siteDb();
 
   await sql.run(
@@ -198,38 +221,89 @@ export async function releaseHold(
       hold_until = null,
       paid_until = null,
       checkout_id = null
-    where id = ?
+    where checkout_id = ?
       and kind = 'sale'
       and status = 'held'
-      and (? is null or checkout_id is null or checkout_id = ?)
     `,
-    [id, checkoutId ?? null, checkoutId ?? null],
+    [orderId],
+  );
+
+  await sql.run(
+    "update orders set status = 'released' where id = ? and status = 'pending'",
+    [orderId],
   );
 }
 
-export async function markPaid(
-  id: number,
-  checkoutId: string,
-) {
+export type OrderView = {
+  id: string;
+
+  slotId: number;
+
+  email: string;
+
+  status: string;
+
+  slotStatus: string | null;
+
+  name: string | null;
+
+  url: string | null;
+};
+
+export async function readOrder(orderId: string): Promise<OrderView | undefined> {
+  const sql = await siteDb();
+
+  await releaseExpired(sql);
+
+  return sql.get<OrderView>(
+    `
+    select
+      orders.id,
+      orders.slot_id as slotId,
+      orders.email,
+      orders.status,
+      slots.status as slotStatus,
+      slots.name,
+      slots.url
+    from orders
+    left join slots
+      on slots.id = orders.slot_id
+      and slots.checkout_id = orders.id
+    where orders.id = ?
+    `,
+    [orderId],
+  );
+}
+
+export async function confirmOrder(orderId: string): Promise<boolean> {
   const sql = await siteDb();
 
   const now = Date.now();
 
-  await sql.run(
+  await releaseExpired(sql, now);
+
+  const changes = await sql.run(
     `
     update slots
     set
       status = 'taken',
       paid_until = ?,
-      hold_until = null,
-      checkout_id = ?
-    where id = ?
+      hold_until = null
+    where checkout_id = ?
       and kind = 'sale'
-      and (
-        checkout_id = ?
-        or (checkout_id is null and status = 'held')
-      )
+      and status = 'held'
     `,
-    [now + TERM_MS, checkoutId, id, checkoutId],
+    [now + TERM_MS, orderId],
   );
+
+  if (changes !== 1) {
+    return false;
+  }
+
+  await sql.run(
+    "update orders set status = 'paid' where id = ?",
+    [orderId],
+  );
+
+  return true;
 }

@@ -48,6 +48,30 @@ function meta(html: string, key: string) {
   return null;
 }
 
+function iconHref(html: string) {
+  const links = html.match(/<link\b[^>]*>/gi) ?? [];
+
+  const ranked = ["apple-touch-icon", "icon"];
+
+  for (const rel of ranked) {
+    for (const tag of links) {
+      const relValue = tag.match(/\brel=["']([^"']+)["']/i)?.[1]?.toLowerCase() ?? "";
+
+      if (!relValue.split(/\s+/).includes(rel)) {
+        continue;
+      }
+
+      const href = tag.match(/\bhref=["']([^"']+)["']/i)?.[1];
+
+      if (href && !href.startsWith("data:")) {
+        return decode(href);
+      }
+    }
+  }
+
+  return null;
+}
+
 function isPrivate(ip: string) {
   const lower = ip.toLowerCase();
 
@@ -225,9 +249,9 @@ function clip(value: string, max: number) {
 function siteName(title: string | null, url: URL) {
   const source = title ?? url.hostname.replace(/^www\./, "");
 
-  const cut = source.split(/\s+[—|–|-]\s+|\s+\|\s+/)[0] ?? source;
+  const cut = source.split(/\s+[—–\-|·:]\s+|:\s+/)[0] ?? source;
 
-  return clip(cut, 48);
+  return clip(cut, 40);
 }
 
 export async function readPreview(raw: string): Promise<Preview> {
@@ -279,7 +303,7 @@ export async function readPreview(raw: string): Promise<Preview> {
       ?? meta(html, "description")
       ?? "";
 
-    const image = meta(html, "og:image");
+    const image = iconHref(html) ?? meta(html, "og:image");
 
     let logoUrl: string | null = null;
 
@@ -297,7 +321,7 @@ export async function readPreview(raw: string): Promise<Preview> {
 
     return {
       name: siteName(title, current),
-      blurb: clip(description, 120),
+      blurb: clip(description, 90),
       logoUrl,
       color: normalizeColor(meta(html, "theme-color")),
       url: current.origin + current.pathname,
