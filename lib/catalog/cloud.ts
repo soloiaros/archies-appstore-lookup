@@ -7,17 +7,23 @@ import {
   rollupMrr,
 } from "@/lib/catalog/revenue";
 
+import { estimated } from "@/lib/provenance/assign";
+
 import { unavailable } from "@/lib/provenance/assign";
 
 import type { Catalog } from "@/lib/catalog/types";
 
 import type { AppDetail } from "@/lib/catalog/detail";
 
+import { vectorFinalists } from "@/lib/catalog/vectors";
+
 import type { SiteSql } from "@/lib/site/types";
 
 import type { AppMetadata } from "@/models/app";
 
 import type { ProvenanceTier } from "@/models/provenance";
+
+import type { RevenueBasis } from "@/models/series";
 
 import type {
   ChartSnapshot,
@@ -257,46 +263,13 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
     },
 
     async finalists(query) {
-      const words = tokens(query);
+      const ranked = await vectorFinalists(sql, query);
 
-      if (words.length === 0) {
-        return [];
+      if (ranked) {
+        return ranked;
       }
 
-      const where = words
-        .map(() => "(lower(name) like ? or lower(description) like ?)")
-        .join(" and ");
-
-      const params = words.flatMap((word) => [`%${word}%`, `%${word}%`]);
-
-      const rows = await sql.all<{
-        trackId: number;
-        name: string;
-        description: string;
-        iconUrl: string;
-      }>(
-        `
-        select
-          track_id as trackId,
-          name,
-          description,
-          icon_url as iconUrl
-        from apps
-        where delisted = 0
-          and ${where}
-        order by length(name)
-        limit 40
-        `,
-        params,
-      );
-
-      return rows.map((row): Finalist => ({
-        trackId: Number(row.trackId),
-        name: String(row.name),
-        description: String(row.description ?? ""),
-        iconUrl: String(row.iconUrl ?? ""),
-        tags: [],
-      }));
+      return lexicalFinalists(sql, query);
     },
 
     async ranked() {
@@ -418,7 +391,11 @@ export async function loadCloudDetail(
 
   const charts = await catalog.charts(trackId);
 
-  const revenue = unavailable();
+  const revenue = await latestRevenue(sql, trackId);
+
+  const tags = await detailTags(sql, trackId);
+
+  const signals = await detailSignals(sql, trackId);
 
   return {
     tier: row.tier === "estimated" ? "estimated" : "verified",
@@ -445,7 +422,7 @@ export async function loadCloudDetail(
     ),
     metadataFetchedAt: String(row.metadataFetchedAt ?? ""),
     delisted: row.delisted === 1,
-    tags: [],
+    tags,
     rating: {
       average: rating?.average ?? null,
       count: rating?.count ?? null,
@@ -456,7 +433,206 @@ export async function loadCloudDetail(
     revenue,
     mrr: rollupMrr(revenue),
     arr: rollupArr(revenue),
-    signals: null,
+    signals,
     matchProbability,
   };
+}
+
+const REVENUE_BASES = new Set<RevenueBasis>([
+  "overall-grossing",
+  "genre-grossing",
+  "genre-ceiling",
+  "below-grossing",
+]);
+
+export async function indexedAppCount(
+  sql: SiteSql,
+): Promise<number> {
+  const row = await sql.get<{ n: number }>(
+    "select count(*) as n from apps where delisted = 0",
+  );
+
+  return Number(row?.n ?? 0);
+}
+
+async function lexicalFinalists(
+  sql: SiteSql,
+  query: string,
+): Promise<Finalist[]> {
+  const words = tokens(query);
+
+  if (words.length === 0) {
+    return [];
+  }
+
+  const where = words
+    .map(() => "(lower(name) like ? or lower(description) like ?)")
+    .join(" and ");
+
+  const params = words.flatMap((word) => [`%${word}%`, `%${word}%`]);
+
+  const rows = await sql.all<{
+    trackId: number;
+    name: string;
+    description: string;
+    iconUrl: string;
+  }>(
+    `
+    select
+      track_id as trackId,
+      name,
+      description,
+      icon_url as iconUrl
+    from apps
+    where delisted = 0
+      and ${where}
+    order by length(name)
+    limit 40
+    `,
+    params,
+  );
+
+  return rows.map((row): Finalist => ({
+    trackId: Number(row.trackId),
+    name: String(row.name),
+    description: String(row.description ?? ""),
+    iconUrl: String(row.iconUrl ?? ""),
+    tags: [],
+  }));
+}
+
+async function latestRevenue(
+  sql: SiteSql,
+  trackId: number,
+) {
+  try {
+    const row = await sql.get<{
+      capturedOn: string;
+      country: string;
+      basis: string;
+      lowUsd: number | null;
+      midUsd: number | null;
+      highUsd: number | null;
+      method: string;
+    }>(
+      `
+      select
+        captured_on as capturedOn,
+        country,
+        basis,
+        low_usd as lowUsd,
+        mid_usd as midUsd,
+        high_usd as highUsd,
+        method
+      from revenue_estimates
+      where track_id = ?
+      order by captured_on desc
+      limit 1
+      `,
+      [trackId],
+    );
+
+    const basis = String(row?.basis ?? "");
+
+    if (
+      !row
+      || String(row.method ?? "").trim().length === 0
+      || !REVENUE_BASES.has(basis as RevenueBasis)
+    ) {
+      return unavailable();
+    }
+
+    return estimated(
+      {
+        low: row.lowUsd === null ? null : Number(row.lowUsd),
+        mid: row.midUsd === null ? null : Number(row.midUsd),
+        high: row.highUsd === null ? null : Number(row.highUsd),
+        basis: basis as RevenueBasis,
+        country: String(row.country),
+        day: String(row.capturedOn),
+      },
+      String(row.method),
+    );
+  } catch {
+    return unavailable();
+  }
+}
+
+async function detailTags(
+  sql: SiteSql,
+  trackId: number,
+): Promise<AppDetail["tags"]> {
+  try {
+    const rows = await sql.all<{
+      tagId: string;
+      tier: string;
+      method: string;
+    }>(
+      `
+      select tag_id as tagId, tier, method
+      from app_tags
+      where track_id = ?
+      `,
+      [trackId],
+    );
+
+    return rows.map((row) => ({
+      tagId: String(row.tagId),
+      tier: asTier(String(row.tier)),
+      method: String(row.method ?? ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function detailSignals(
+  sql: SiteSql,
+  trackId: number,
+): Promise<AppDetail["signals"]> {
+  try {
+    const row = await sql.get<{
+      colorText: string;
+      letters: string;
+      tier: string;
+      method: string;
+    }>(
+      `
+      select
+        color_text as colorText,
+        letters,
+        tier,
+        method
+      from icon_signals
+      where track_id = ?
+      limit 1
+      `,
+      [trackId],
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      colorText: String(row.colorText ?? ""),
+      letters: String(row.letters ?? ""),
+      tier: asTier(String(row.tier)),
+      method: String(row.method ?? ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function asTier(value: string): ProvenanceTier {
+  if (
+    value === "verified"
+    || value === "estimated"
+    || value === "unavailable"
+  ) {
+    return value;
+  }
+
+  return "estimated";
 }
