@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { ProButton } from "@/components/ui/ProButton";
-
 const GITHUB_REPO =
   "https://github.com/soloiaros/archies-appstore-lookup";
 
@@ -21,18 +19,6 @@ const LINKS = [
   {
     href: "/how-to-use",
     label: "How to use",
-  },
-  {
-    href: "/terms",
-    label: "Terms",
-  },
-  {
-    href: "/privacy",
-    label: "Privacy",
-  },
-  {
-    href: "/refund",
-    label: "Refunds",
   },
 ] as const;
 
@@ -116,8 +102,6 @@ export function HomeFooter() {
               {item.label}
             </Link>
           ))}
-
-          <ProButton variant="text" />
 
           <a
             className="home-footer-link"

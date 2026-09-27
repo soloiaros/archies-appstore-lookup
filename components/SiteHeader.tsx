@@ -8,8 +8,6 @@ import { usePathname } from "next/navigation";
 
 import { Key } from "@/components/ui/Key";
 
-import { ProButton } from "@/components/ui/ProButton";
-
 import { playButtonSound } from "@/lib/sounds";
 
 const NAV = [
@@ -144,8 +142,6 @@ export function SiteHeader() {
                   </Key>
                 );
               })}
-
-              <ProButton />
             </nav>
           </div>
         </div>

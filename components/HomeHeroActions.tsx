@@ -2,8 +2,6 @@
 
 import Link from "next/link";
 
-import { ProButton } from "@/components/ui/ProButton";
-
 import { playButtonSound } from "@/lib/sounds";
 
 export function HomeHeroActions() {
@@ -17,8 +15,6 @@ export function HomeHeroActions() {
       >
         <span className="ui-key-label">Use for free</span>
       </Link>
-
-      <ProButton />
     </div>
   );
 }
