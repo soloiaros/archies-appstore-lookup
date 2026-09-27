@@ -2,6 +2,8 @@ import fs from "node:fs";
 
 import path from "node:path";
 
+import bundledAtlas from "../public/atlas/pile.json";
+
 /** Packed pile sheet from `scripts/build-atlas.mjs`. */
 export type PileAtlas = {
   cell: number;
@@ -15,6 +17,8 @@ export type PileAtlas = {
   ids: string[];
 
   srcs: string[];
+
+  indexed: number;
 };
 
 const FILE = path.join(
@@ -49,6 +53,6 @@ export function pileAtlas(): PileAtlas | null {
 
     return loaded.atlas;
   } catch {
-    return null;
+    return bundledAtlas as PileAtlas;
   }
 }
