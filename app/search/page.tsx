@@ -25,7 +25,7 @@ const shuffle = <T,>(list: T[]) => {
 export default async function SearchPage() {
   const atlas = pileAtlas();
 
-  let indexed = atlas?.ids.length ?? 0;
+  let indexed = atlas?.indexed ?? atlas?.ids.length ?? 0;
 
   let loose: Array<{
     id: string;

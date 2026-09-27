@@ -10,6 +10,8 @@ import { SectionPage } from "@/components/DirectionalPage";
 
 import { VendingMachineScene } from "@/components/VendingMachineScene";
 
+import { pileAtlas } from "@/lib/atlas";
+
 export const dynamic = "force-dynamic";
 
 const STEPS = [
@@ -30,20 +32,8 @@ const STEPS = [
   },
 ] as const;
 
-async function indexedCount() {
-  try {
-    const { pileScene } = await import(
-      "@/lib/catalog/pile"
-    );
-
-    return pileScene(1).indexed;
-  } catch {
-    return 0;
-  }
-}
-
-export default async function HomePage() {
-  const indexed = await indexedCount();
+export default function HomePage() {
+  const indexed = pileAtlas()?.indexed ?? 0;
 
   return (
     <SectionPage>
