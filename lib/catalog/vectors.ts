@@ -765,29 +765,52 @@ function tagOverlap(
   );
 }
 
+const BIND_CAP = 40;
+
+function chunks<T>(items: T[]): T[][] {
+  const out: T[][] = [];
+
+  for (let index = 0; index < items.length; index += BIND_CAP) {
+    out.push(items.slice(index, index + BIND_CAP));
+  }
+
+  return out;
+}
+
 async function hydrate(
   sql: SiteSql,
   ids: number[],
 ): Promise<Finalist[]> {
-  const marks = ids.map(() => "?").join(", ");
-
-  const apps = await sql.all<{
+  const apps: Array<{
     trackId: number;
     name: string;
     description: string;
     iconUrl: string;
-  }>(
-    `
-    select
-      track_id as trackId,
-      name,
-      description,
-      icon_url as iconUrl
-    from apps
-    where track_id in (${marks})
-    `,
-    ids,
-  );
+  }> = [];
+
+  for (const slice of chunks(ids)) {
+    const marks = slice.map(() => "?").join(", ");
+
+    const rows = await sql.all<{
+      trackId: number;
+      name: string;
+      description: string;
+      iconUrl: string;
+    }>(
+      `
+      select
+        track_id as trackId,
+        name,
+        description,
+        icon_url as iconUrl
+      from apps
+      where track_id in (${marks})
+      `,
+      slice,
+    );
+
+    apps.push(...rows);
+  }
 
   const byId = new Map(
     apps.map((row) => [Number(row.trackId), row]),
@@ -796,17 +819,28 @@ async function hydrate(
   const tags = new Map<number, string[]>();
 
   try {
-    const rows = await sql.all<{
+    const rows: Array<{
       trackId: number;
       tagId: string;
-    }>(
-      `
-      select track_id as trackId, tag_id as tagId
-      from app_tags
-      where track_id in (${marks})
-      `,
-      ids,
-    );
+    }> = [];
+
+    for (const slice of chunks(ids)) {
+      const marks = slice.map(() => "?").join(", ");
+
+      const page = await sql.all<{
+        trackId: number;
+        tagId: string;
+      }>(
+        `
+        select track_id as trackId, tag_id as tagId
+        from app_tags
+        where track_id in (${marks})
+        `,
+        slice,
+      );
+
+      rows.push(...page);
+    }
 
     for (const row of rows) {
       const trackId = Number(row.trackId);
@@ -827,21 +861,33 @@ async function hydrate(
   >();
 
   try {
-    const rows = await sql.all<{
+    const rows: Array<{
       trackId: number;
       colorText: string;
       letters: string;
-    }>(
-      `
-      select
-        track_id as trackId,
-        color_text as colorText,
-        letters
-      from icon_signals
-      where track_id in (${marks})
-      `,
-      ids,
-    );
+    }> = [];
+
+    for (const slice of chunks(ids)) {
+      const marks = slice.map(() => "?").join(", ");
+
+      const page = await sql.all<{
+        trackId: number;
+        colorText: string;
+        letters: string;
+      }>(
+        `
+        select
+          track_id as trackId,
+          color_text as colorText,
+          letters
+        from icon_signals
+        where track_id in (${marks})
+        `,
+        slice,
+      );
+
+      rows.push(...page);
+    }
 
     for (const row of rows) {
       signals.set(Number(row.trackId), {
