@@ -28,8 +28,7 @@
   "containers": [
     {
       "class_name": "IconEmbed",
-      "image": "./container/Dockerfile",
-      "image_build_context": "./container",
+      "image": "registry.cloudflare.com/fd75e45889c3e4480b8ccee44f51156a/archies-appstore-lookup-iconembed@sha256:1b6c633c7c7083d8e491bf0f33ddf000896f0f2ae79dc5b1280e634b9dcf6e2d",
       "max_instances": 1,
       "instance_type": "standard-1"
     }
