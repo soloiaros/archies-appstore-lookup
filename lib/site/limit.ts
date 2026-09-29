@@ -4,8 +4,6 @@ import { siteDb } from "@/lib/site/db";
 
 const HOUR = 60 * 60 * 1000;
 
-const DAY = 24 * HOUR;
-
 export async function underLimit(
   request: Request,
   bucket: string,
@@ -79,14 +77,4 @@ export function tooMany(message: string, windowMs = HOUR) {
       },
     },
   );
-}
-
-export async function allowOrder(request: Request) {
-  const hour = await underLimit(request, "sponsor-order", 5);
-
-  if (!hour) {
-    return false;
-  }
-
-  return underLimit(request, "sponsor-order-day", 10, DAY);
 }
