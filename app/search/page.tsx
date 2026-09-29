@@ -70,6 +70,7 @@ export default async function SearchPage() {
   return (
     <SectionPage>
       <link
+        media="(min-width: 721px)"
         rel="preload"
         as="image"
         href="/atlas/pile.webp"
