@@ -191,7 +191,7 @@ export function AppDetail({
             </div>
 
             <a
-              className="ui-key sponsor-submit app-store-link"
+              className="ui-key ui-key-solid app-store-link"
               href={detail.storeUrl}
               target="_blank"
               rel="noreferrer"

@@ -31,8 +31,8 @@ const SIDE = [
     label: "Stats",
   },
   {
-    href: "/sponsor",
-    label: "Sponsor",
+    href: "/support",
+    label: "Support",
   },
 ] as const;
 
