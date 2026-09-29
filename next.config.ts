@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
         destination: "/refund",
         permanent: true,
       },
+      {
+        source: "/sponsor",
+        destination: "/support",
+        permanent: true,
+      },
     ];
   },
 };

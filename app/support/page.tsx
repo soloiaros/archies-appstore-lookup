@@ -66,8 +66,6 @@ export default function SupportPage() {
         >
           <div className="board-block-head">
             <h2 id="ways-title">Ways to help</h2>
-
-            <p>pick one</p>
           </div>
 
           <ol className="step-grid">
