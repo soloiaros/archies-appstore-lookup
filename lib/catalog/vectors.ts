@@ -1,58 +1,37 @@
-import tagFile from "@/data/tags/tags.json";
-
-import { iconEmbed, workersAi } from "@/lib/site/db";
+import {
+  catalogRank,
+  iconEmbed,
+  workersAi,
+  type EdgeStub,
+  type IconEmbedNamespace,
+} from "@/lib/site/db";
 
 import type { SiteSql } from "@/lib/site/types";
 
-import {
-  LETTER_WORDS,
-  queryMentionsLetters,
-} from "@/lib/retrieve/cues";
-
 import type { Finalist } from "@/lib/types";
 
-const STORED_MODEL = "Xenova/bge-small-en-v1.5";
+import {
+  ICON_DIMS,
+  ICON_MODEL,
+  TEXT_DIMS,
+  TEXT_MODEL,
+  decodeVector,
+  emptyPacked,
+  encodeVector,
+  nominateIds,
+  packVectors,
+  type CatalogApp,
+  type PackedVectors,
+} from "@/lib/catalog/rank";
 
 const QUERY_MODEL = "@cf/baai/bge-small-en-v1.5";
 
 const ASKING =
   "Represent this sentence for searching relevant passages: ";
 
-const BGE_DIMS = 384;
-
-const SIGLIP_MODEL = "onnx-community/siglip2-base-patch16-224-ONNX";
-
-const SIGLIP_DIMS = 768;
-
-const BY_MEANING = 40;
-
-const BY_LOOKS = 40;
-
-const BY_TAGS = 16;
-
-const BY_LEXICAL = 16;
-
-const BY_NAME = 25;
-
-const FINALIST_CAP = 120;
-
 const DEEPEN_CAP = 60;
 
-const TAGS = tagFile.tags;
-
 const PAGE = 500;
-
-type CatalogApp = {
-  trackId: number;
-
-  name: string;
-
-  blurb: string;
-
-  letters: string;
-
-  tags: string[];
-};
 
 let textVectors: Map<number, Float32Array> | null = null;
 
@@ -71,94 +50,174 @@ export async function vectorFinalists(
   query: string,
 ): Promise<Finalist[] | null> {
   try {
-    const vectors = await loadTextVectors(sql);
+    const ranker = await catalogRank();
 
-    if (vectors.size === 0) {
-      return null;
-    }
+    const gate = { ranker: Boolean(ranker) };
 
-    const asking = await embedQuery(query);
+    const [asking, looking] = await Promise.all([
+      embedQuery(query),
+      embedIconQuery(query).catch(() => null),
+      (async () => {
+        if (!ranker) {
+          gate.ranker = false;
+
+          await warmIsolate(sql);
+
+          return;
+        }
+
+        try {
+          const ready = await warmRanker(ranker);
+
+          if (!ready) {
+            gate.ranker = false;
+
+            await warmIsolate(sql);
+          }
+        } catch (error) {
+          console.error("catalog rank", error);
+
+          gate.ranker = false;
+
+          await warmIsolate(sql);
+        }
+      })(),
+    ]);
 
     if (!asking) {
       return null;
     }
 
-    const nominated = new Map<number, number>();
+    if (ranker && gate.ranker) {
+      try {
+        const ids = await nominateRemote(
+          ranker,
+          query,
+          asking,
+          looking,
+        );
 
-    const bump = (trackId: number, score: number) => {
-      nominated.set(
-        trackId,
-        Math.max(nominated.get(trackId) ?? 0, score),
-      );
-    };
+        if (ids) {
+          if (ids.length === 0) {
+            return [];
+          }
 
-    const apps = await loadCatalog(sql);
-
-    const meaning = [...vectors.entries()]
-      .map(([trackId, vector]) => ({
-        trackId,
-        score: cosine(asking, vector),
-      }))
-      .sort((left, right) => right.score - left.score)
-      .slice(0, BY_MEANING);
-
-    for (const hit of meaning) {
-      bump(hit.trackId, hit.score);
-    }
-
-    try {
-      const looking = await embedIconQuery(query);
-
-      const icons = await loadIconVectors(sql);
-
-      if (looking && icons.size > 0) {
-        const looks = [...icons.entries()]
-          .map(([trackId, vector]) => ({
-            trackId,
-            score: cosine(looking, vector),
-          }))
-          .sort((left, right) => right.score - left.score)
-          .slice(0, BY_LOOKS);
-
-        for (const hit of looks) {
-          bump(hit.trackId, 0.5 + hit.score);
+          return hydrate(sql, ids);
         }
-      }
-    } catch {
-      // icon channel skipped
-    }
-
-    for (const hit of tagOverlap(query, apps).slice(0, BY_TAGS)) {
-      bump(hit.trackId, 0.4 + hit.score);
-    }
-
-    for (const hit of lexicalHits(query, apps).slice(0, BY_LEXICAL)) {
-      bump(hit.trackId, 0.3 + hit.score);
-    }
-
-    for (const trackId of nameHits(query, apps).slice(0, BY_NAME)) {
-      bump(trackId, 0.95);
-    }
-
-    if (queryMentionsLetters(query)) {
-      for (const trackId of letterHits(query, apps)) {
-        bump(trackId, 0.9);
+      } catch (error) {
+        console.error("catalog rank", error);
       }
     }
 
-    const ids = [...nominated.entries()]
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, FINALIST_CAP)
-      .map(([trackId]) => trackId);
-
-    if (ids.length === 0) {
-      return [];
-    }
-
-    return hydrate(sql, ids);
+    return rankFromCaches(sql, query, asking, looking);
   } catch {
     return null;
   }
+}
+
+async function warmRanker(ranker: EdgeStub): Promise<boolean> {
+  const response = await ranker.fetch("https://catalog/warm", {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    return false;
+  }
+
+  const body = await response.json() as { ok?: boolean };
+
+  return body.ok === true;
+}
+
+async function nominateRemote(
+  ranker: EdgeStub,
+  query: string,
+  asking: Float32Array,
+  looking: Float32Array | null,
+): Promise<number[] | null> {
+  const response = await ranker.fetch("https://catalog/nominate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      text: encodeVector(asking),
+      icon: looking ? encodeVector(looking) : null,
+    }),
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const body = await response.json() as {
+    ok?: boolean;
+
+    ids?: number[];
+  };
+
+  if (!body.ok || !Array.isArray(body.ids)) {
+    return null;
+  }
+
+  return body.ids.map((id) => Number(id));
+}
+
+async function warmIsolate(sql: SiteSql): Promise<void> {
+  await Promise.all([
+    loadTextVectors(sql),
+    loadIconVectors(sql).catch(() => new Map()),
+    loadCatalog(sql),
+  ]);
+}
+
+async function rankFromCaches(
+  sql: SiteSql,
+  query: string,
+  asking: Float32Array,
+  looking: Float32Array | null,
+): Promise<Finalist[] | null> {
+  const vectors = await loadTextVectors(sql);
+
+  if (vectors.size === 0) {
+    return null;
+  }
+
+  const [icons, apps] = await Promise.all([
+    loadIconVectors(sql).catch(() => new Map<number, Float32Array>()),
+    loadCatalog(sql),
+  ]);
+
+  const ids = nominateIds(
+    query,
+    apps,
+    asking,
+    packMap(vectors, TEXT_DIMS),
+    looking,
+    icons.size > 0
+      ? packMap(icons, ICON_DIMS)
+      : emptyPacked(ICON_DIMS),
+  );
+
+  if (ids.length === 0) {
+    return [];
+  }
+
+  return hydrate(sql, ids);
+}
+
+function packMap(
+  vectors: Map<number, Float32Array>,
+  dims: number,
+): PackedVectors {
+  const rows: Array<{ trackId: number; vector: Float32Array }> = [];
+
+  for (const [trackId, vector] of vectors) {
+    rows.push({ trackId, vector });
+  }
+
+  return packVectors(rows, dims);
 }
 
 async function embedQuery(
@@ -177,7 +236,7 @@ async function embedQuery(
 
   const raw = firstVector(result?.data);
 
-  if (!raw || raw.length !== BGE_DIMS) {
+  if (!raw || raw.length !== TEXT_DIMS) {
     return null;
   }
 
@@ -250,7 +309,7 @@ async function readTextVectors(
       order by track_id
       limit ${PAGE}
       `,
-      [STORED_MODEL, after],
+      [TEXT_MODEL, after],
     );
 
     if (rows.length === 0) {
@@ -262,7 +321,7 @@ async function readTextVectors(
 
       const vector = decodeVector(
         String(row.vector ?? ""),
-        BGE_DIMS * 4,
+        TEXT_DIMS * 4,
       );
 
       if (vector) {
@@ -280,6 +339,10 @@ async function readTextVectors(
   return vectors;
 }
 
+function siglipStub(namespace: IconEmbedNamespace): EdgeStub {
+  return namespace.getByName("siglip");
+}
+
 async function embedIconQuery(
   query: string,
 ): Promise<Float32Array | null> {
@@ -289,8 +352,7 @@ async function embedIconQuery(
     return null;
   }
 
-  const response = await namespace
-    .getByName("siglip")
+  const response = await siglipStub(namespace)
     .fetch("http://icon-embed/", {
       method: "POST",
       headers: {
@@ -308,7 +370,7 @@ async function embedIconQuery(
     vector?: number[];
   };
 
-  if (!body.vector || body.vector.length !== SIGLIP_DIMS) {
+  if (!body.vector || body.vector.length !== ICON_DIMS) {
     return null;
   }
 
@@ -364,7 +426,7 @@ async function readIconVectors(
       order by track_id
       limit ${page}
       `,
-      [SIGLIP_MODEL, after],
+      [ICON_MODEL, after],
     );
 
     if (rows.length === 0) {
@@ -376,7 +438,7 @@ async function readIconVectors(
 
       const vector = decodeVector(
         String(row.vector ?? ""),
-        SIGLIP_DIMS * 4,
+        ICON_DIMS * 4,
       );
 
       if (vector) {
@@ -575,40 +637,6 @@ export async function deepenCandidates(
   return hydrate(sql, ids);
 }
 
-function decodeVector(
-  encoded: string,
-  width: number,
-): Float32Array | null {
-  if (encoded.length === 0) {
-    return null;
-  }
-
-  const bytes = Buffer.from(encoded, "base64");
-
-  if (bytes.byteLength !== width) {
-    return null;
-  }
-
-  const copy = new Uint8Array(bytes.byteLength);
-
-  copy.set(bytes);
-
-  return new Float32Array(copy.buffer);
-}
-
-function cosine(
-  left: Float32Array,
-  right: Float32Array,
-): number {
-  let sum = 0;
-
-  for (let index = 0; index < left.length; index += 1) {
-    sum += left[index]! * right[index]!;
-  }
-
-  return sum;
-}
-
 function l2Normalize(vector: Float32Array): Float32Array {
   let sum = 0;
 
@@ -629,140 +657,6 @@ function l2Normalize(vector: Float32Array): Float32Array {
   }
 
   return out;
-}
-
-function wordsOf(query: string, min: number): string[] {
-  return tokenize(query).filter((word) => word.length >= min);
-}
-
-function tokenize(text: string): string[] {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]+/g, " ")
-    .split(/[\s-]+/)
-    .filter(Boolean);
-}
-
-function nameHits(
-  query: string,
-  apps: CatalogApp[],
-): number[] {
-  const words = wordsOf(query, 4);
-
-  if (words.length === 0) {
-    return [];
-  }
-
-  return apps
-    .filter((app) => {
-      const name = app.name.toLowerCase();
-
-      return words.some((word) => name.includes(word));
-    })
-    .map((app) => app.trackId);
-}
-
-function lexicalHits(
-  query: string,
-  apps: CatalogApp[],
-): Array<{ trackId: number; score: number }> {
-  const words = wordsOf(query, 3);
-
-  if (words.length === 0) {
-    return [];
-  }
-
-  return apps
-    .map((app) => {
-      const hay = tokenize(`${app.name} ${app.blurb}`);
-
-      let hits = 0;
-
-      for (const word of words) {
-        if (hay.includes(word)) {
-          hits += 1;
-        }
-      }
-
-      return {
-        trackId: app.trackId,
-        score: hits / words.length,
-      };
-    })
-    .filter((row) => row.score > 0)
-    .sort((left, right) => right.score - left.score);
-}
-
-function letterHits(
-  query: string,
-  apps: CatalogApp[],
-): number[] {
-  const words = tokenize(query).filter(
-    (word) => word.length >= 3 && !LETTER_WORDS.has(word),
-  );
-
-  if (words.length === 0) {
-    return [];
-  }
-
-  return apps
-    .filter((app) => {
-      const letters = app.letters.toLowerCase();
-
-      return (
-        letters.length > 0
-        && words.some((word) => letters.includes(word))
-      );
-    })
-    .map((app) => app.trackId);
-}
-
-function tagOverlap(
-  query: string,
-  apps: CatalogApp[],
-): Array<{ trackId: number; score: number }> {
-  const words = tokenize(query);
-
-  if (words.length === 0) {
-    return [];
-  }
-
-  const matched = new Set<string>();
-
-  for (const tag of TAGS) {
-    const hay = tokenize(`${tag.id} ${tag.label}`);
-
-    if (hay.some((word) => words.includes(word))) {
-      matched.add(tag.id);
-    }
-  }
-
-  if (matched.size === 0) {
-    return [];
-  }
-
-  const scores: Array<{ trackId: number; score: number }> = [];
-
-  for (const app of apps) {
-    let hits = 0;
-
-    for (const tag of app.tags) {
-      if (matched.has(tag)) {
-        hits += 1;
-      }
-    }
-
-    if (hits > 0) {
-      scores.push({
-        trackId: app.trackId,
-        score: hits / matched.size,
-      });
-    }
-  }
-
-  return scores.sort(
-    (left, right) => right.score - left.score,
-  );
 }
 
 const BIND_CAP = 40;
