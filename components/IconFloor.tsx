@@ -106,6 +106,10 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
   }, [seats, openTrackId]);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 720px)").matches) {
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { alpha: true });

@@ -12,7 +12,11 @@ import {
 
 import { addTransitionType } from "react";
 
-import { AppDetail } from "@/components/AppCard";
+import {
+  AppDetail,
+  IconMorph,
+  TitleMorph,
+} from "@/components/AppCard";
 
 import { ComparativeList } from "@/components/ComparativeList";
 
@@ -28,9 +32,13 @@ import {
 
 import { NoticeSurface } from "@/components/NoticeSurface";
 
+import { OutputPanel } from "@/components/OutputPanel";
+
 import { OutputShell } from "@/components/OutputShell";
 
 import { LiveStats } from "@/components/LiveStats";
+
+import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import { SearchComposer } from "@/components/SearchComposer";
 
@@ -72,11 +80,19 @@ export function QueryScreen({
   const [pileCap, setPileCap] = useState<number | null>(null);
 
   useLayoutEffect(() => {
-    setPileCap(
-      window.matchMedia("(max-width: 720px)").matches
-        ? 150
-        : 300,
-    );
+    const mq = window.matchMedia("(max-width: 720px)");
+
+    const apply = () => {
+      setPileCap(mq.matches ? 0 : 300);
+    };
+
+    apply();
+
+    mq.addEventListener("change", apply);
+
+    return () => {
+      mq.removeEventListener("change", apply);
+    };
   }, []);
 
   const [text, setText] = useState("");
@@ -466,7 +482,7 @@ export function QueryScreen({
 
   return (
     <>
-      {pileCap != null ? (
+      {pileCap != null && pileCap > 0 ? (
       <IconFloor
         sources={sources}
         cells={cells}
@@ -488,7 +504,10 @@ export function QueryScreen({
       ) : (
         <>
           <SearchPage>
-            <main className="stage-layer">
+            <main
+              className="stage-layer"
+              data-results={outputShown ? "true" : "false"}
+            >
               <div
                 ref={bar}
                 className="stage-bar"
@@ -588,6 +607,60 @@ export function QueryScreen({
                 rows={state.answer.rows}
                 tier={state.answer.tier}
               />
+            </OutputShell>
+          ) : null}
+
+          {pileCap === 0
+          && discoveryShown
+          && state.phase === "done"
+          && state.answer.shape === "discovery" ? (
+            <OutputShell>
+              <OutputPanel data-shape="discovery">
+                <h2>
+                  Matches
+                  {" "}
+                  <ProvenanceMark tier={state.answer.tier} />
+                </h2>
+
+                <ol className="hit-list">
+                  {state.answer.hits.map((hit, index) => (
+                    <li
+                      key={hit.trackId}
+                      className="rise"
+                      style={{ ["--i" as string]: index }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void openById(
+                            hit.trackId,
+                            hit.probability,
+                            hit.iconUrl,
+                          );
+                        }}
+                      >
+                        <IconMorph trackId={hit.trackId}>
+                          <img
+                            src={hit.iconUrl}
+                            alt=""
+                            width={56}
+                            height={56}
+                          />
+                        </IconMorph>
+
+                        <TitleMorph trackId={hit.trackId}>
+                          <span>{hit.name}</span>
+                        </TitleMorph>
+
+                        <span className="hit-score">
+                          {Math.round(hit.probability * 100)}
+                          %
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </OutputPanel>
             </OutputShell>
           ) : null}
         </>
