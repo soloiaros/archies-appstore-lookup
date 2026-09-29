@@ -4,7 +4,7 @@ import { ensureSchema, fromD1, type D1Database } from "../lib/site/d1";
 
 import { Presence } from "../lib/site/presence-do";
 
-import { releaseExpired } from "../lib/site/sweep";
+import { sweepSite } from "../lib/site/sweep";
 
 export { IconEmbed } from "./icon-embed";
 
@@ -73,7 +73,7 @@ export default {
     ctx.waitUntil((async () => {
       await ensureSchema(sql, token);
 
-      await releaseExpired(sql);
+      await sweepSite(sql);
 
       if (catalog) {
         await refreshIndexCount(sql, catalog);
