@@ -29,7 +29,7 @@
     {
       "class_name": "IconEmbed",
       "image": "registry.cloudflare.com/fd75e45889c3e4480b8ccee44f51156a/archies-appstore-lookup-iconembed@sha256:1b6c633c7c7083d8e491bf0f33ddf000896f0f2ae79dc5b1280e634b9dcf6e2d",
-      "max_instances": 1,
+      "max_instances": 2,
       "instance_type": "standard-1"
     }
   ],
@@ -54,6 +54,10 @@
       {
         "name": "ICON_EMBED",
         "class_name": "IconEmbed"
+      },
+      {
+        "name": "CATALOG_RANK",
+        "class_name": "CatalogRank"
       }
     ]
   },
@@ -65,6 +69,10 @@
     {
       "tag": "v2",
       "new_sqlite_classes": ["IconEmbed"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["CatalogRank"]
     }
   ],
   "triggers": {

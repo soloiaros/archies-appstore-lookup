@@ -8,6 +8,8 @@ import { sweepSite } from "../lib/site/sweep";
 
 export { IconEmbed } from "./icon-embed";
 
+export { CatalogRank } from "../lib/catalog/rank-do";
+
 export { Presence };
 
 type FetchHandler = (
