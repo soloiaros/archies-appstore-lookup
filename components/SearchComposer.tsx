@@ -57,7 +57,7 @@ export function SearchComposer({
 
   const [ready, setReady] = useState(false);
 
-  const [hint, setHint] = useState(FALLBACK);
+  const [hint, setHint] = useState<string>(FALLBACK);
 
   const [focused, setFocused] = useState(false);
 
