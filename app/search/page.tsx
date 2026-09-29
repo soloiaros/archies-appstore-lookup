@@ -6,10 +6,6 @@ import { pileAtlas } from "@/lib/atlas";
 
 import { shownIndexedCount } from "@/lib/catalog/shown-count";
 
-import { formatPrice, sponsorPriceCents } from "@/lib/site/price";
-
-import { fallbackSlots, listSlots } from "@/lib/site/slots";
-
 export const dynamic = "force-dynamic";
 
 const PILE = 300;
@@ -71,8 +67,6 @@ export default async function SearchPage() {
 
   const shown = shuffle(loose).slice(0, PILE);
 
-  const slots = await listSlots().catch(() => fallbackSlots());
-
   return (
     <SectionPage>
       <link
@@ -85,8 +79,6 @@ export default async function SearchPage() {
         <QueryScreen
           icons={shown}
           indexed={indexed}
-          slots={slots}
-          priceLabel={formatPrice(sponsorPriceCents())}
           sheet={
             atlas
               ? {

@@ -63,7 +63,7 @@ export default function HowToUsePage() {
           </div>
 
           <Link
-            className="ui-key sponsor-submit"
+            className="ui-key ui-key-solid"
             href="/search"
             transitionTypes={["section"]}
           >

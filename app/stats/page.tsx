@@ -224,7 +224,7 @@ export default async function StatsPage({
         <p className="board-foot">
           Counted on this site.
           {" "}
-          <Link href="/sponsor">Sponsor a slot</Link>
+          <Link href="/support">Support 10K</Link>
         </p>
       </main>
     </SectionPage>
