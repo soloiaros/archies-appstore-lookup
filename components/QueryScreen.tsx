@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -66,6 +67,16 @@ export function QueryScreen({
 }) {
   const [pileIcons] = useState(() => icons);
 
+  const [pileCap, setPileCap] = useState<number | null>(null);
+
+  useLayoutEffect(() => {
+    setPileCap(
+      window.matchMedia("(max-width: 720px)").matches
+        ? 150
+        : 300,
+    );
+  }, []);
+
   const [text, setText] = useState("");
 
   const { state, run } = useQuery();
@@ -104,8 +115,11 @@ export function QueryScreen({
   const route = useRoute(shape);
 
   const drawn = useMemo(
-    () => pileIcons.slice(0, Math.min(300, pileIcons.length)),
-    [pileIcons],
+    () =>
+      pileCap == null
+        ? []
+        : pileIcons.slice(0, Math.min(pileCap, pileIcons.length)),
+    [pileIcons, pileCap],
   );
 
   const sources = useMemo(
@@ -450,6 +464,7 @@ export function QueryScreen({
 
   return (
     <>
+      {pileCap != null ? (
       <IconFloor
         sources={sources}
         cells={cells}
@@ -460,6 +475,7 @@ export function QueryScreen({
         openTrackId={detail?.trackId ?? null}
         onSeat={onSeat}
       />
+      ) : null}
 
       {detail ? (
         <AppDetail
