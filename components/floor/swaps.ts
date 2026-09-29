@@ -4,13 +4,9 @@ import { POP_IN, POP_OUT } from "./pop";
 import { createReserve } from "./reserve";
 import type { Scene } from "./scene";
 
-const CHURN = 900; // ms between swaps: the pile is a moving window onto a library far larger than it can hold. Slower than
-// when a swap happened in place, because now each one is a visible little event: one icon goes, another falls in.
-
-/** Images popping in and out of the pile: the steady churn, and a search match that was not in the pile yet. */
+/** Images popping in for a search match that was not in the pile yet. */
 export function createSwaps(scene: Scene, isDragged: (i: number) => boolean, stats: { swaps: number }) {
   const reserve = createReserve((src) => scene.srcs.includes(src));
-  let churnAt = performance.now() + 6000; // the pile pours first
 
   return {
     /**
@@ -21,15 +17,8 @@ export function createSwaps(scene: Scene, isDragged: (i: number) => boolean, sta
       scene.pops.set(slot, { t0: performance.now() + delay, img, src, swapped: false, rain, then });
     },
 
-    /** Every third of a second one image in the pile pops away and another from the library takes its place. */
-    churn(now: number) {
-      if (now < churnAt || scene.added < scene.bodies.length) return;
-      churnAt = now + CHURN * (0.6 + Math.random() * 0.8);
-      const i = Math.floor(Math.random() * scene.added);
-      if (scene.holds.has(i) || scene.grown.has(i) || scene.pops.has(i) || isDragged(i)) return;
-      const img = reserve.next();
-      if (img) this.swapIn(i, img, img.getAttribute("src")!, 0, undefined, true);
-    },
+    /** Idle library rain — off. It never stopped waking the pile and on phones it crushed the tab. */
+    churn(_now: number) {},
 
     /** Swaps in progress: at the halfway point the slot gets its new image. */
     run(now: number) {

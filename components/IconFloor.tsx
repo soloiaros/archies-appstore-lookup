@@ -111,6 +111,12 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
+    // Strict Mode remounts effects sync: defer boot so the discarded pass never builds a world.
+    let cancelled = false;
+    let teardown: (() => void) | null = null;
+    const bootId = requestAnimationFrame(() => {
+      if (cancelled) return;
+
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const engine = Matter.Engine.create({ gravity: { x: 0, y: 1, scale: 0.001 } });
     engine.enableSleeping = true; // bodies that stop moving leave the solver: no jitter, and far less CPU
@@ -539,6 +545,19 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
     onReady?.();
 
     const onResize = () => {
+      const beforeH = scene.height;
+      const beforeW = scene.width;
+      const nextW = canvas.clientWidth;
+      const nextH = canvas.clientHeight;
+      // Soft keyboard: width holds, height drops. Keep the world; only refresh the bitmap.
+      if (beforeW > 0 && nextW === beforeW && nextH > 0 && nextH < beforeH) {
+        const dpr = scene.dpr;
+        canvas.width = Math.round(nextW * dpr);
+        canvas.height = Math.round(nextH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        scene.dirty = true;
+        return;
+      }
       resize();
       matches.relayout();
       for (let i = 0; i < scene.added; i++) {
@@ -562,7 +581,7 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
     };
     window.addEventListener("wheel", onWheel, { passive: false });
 
-    return () => {
+    teardown = () => {
       cancelAnimationFrame(raf);
       window.clearInterval(keep);
       window.removeEventListener("resize", onResize);
@@ -580,6 +599,13 @@ export const IconFloor = memo(function IconFloor({ sources, cells, sheet, apiRef
       if (held.__floor === stats) delete held.__floor;
       Matter.Composite.clear(engine.world, false);
       Matter.Engine.clear(engine);
+    };
+    });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(bootId);
+      teardown?.();
     };
   }, [sources, cells, sheet, apiRef, onReady]);
 

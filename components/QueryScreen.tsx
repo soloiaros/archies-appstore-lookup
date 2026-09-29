@@ -67,6 +67,8 @@ export function QueryScreen({
 }) {
   const [pileIcons] = useState(() => icons);
 
+  const [heldSheet] = useState(() => sheet);
+
   const [pileCap, setPileCap] = useState<number | null>(null);
 
   useLayoutEffect(() => {
@@ -468,7 +470,7 @@ export function QueryScreen({
       <IconFloor
         sources={sources}
         cells={cells}
-        sheet={sheet}
+        sheet={heldSheet}
         apiRef={floor}
         onReady={onFloorReady}
         onMatchOpen={onMatchOpen}
