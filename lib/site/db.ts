@@ -12,13 +12,31 @@ type PresenceNamespace = {
   };
 };
 
+export type EdgeStub = {
+  fetch(
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ): Promise<Response>;
+};
+
 export type IconEmbedNamespace = {
-  getByName(name: string): {
-    fetch(
-      input: RequestInfo | URL,
-      init?: RequestInit,
-    ): Promise<Response>;
-  };
+  idFromName?(name: string): unknown;
+
+  get?(
+    id: unknown,
+    options?: { locationHint?: string },
+  ): EdgeStub;
+
+  getByName(name: string): EdgeStub;
+};
+
+export type CatalogRankNamespace = {
+  idFromName(name: string): unknown;
+
+  get(
+    id: unknown,
+    options?: { locationHint?: string },
+  ): EdgeStub;
 };
 
 export type WorkersAi = {
@@ -41,6 +59,8 @@ type CfEnv = {
   AI?: WorkersAi;
 
   ICON_EMBED?: IconEmbedNamespace;
+
+  CATALOG_RANK?: CatalogRankNamespace;
 };
 
 const d1Token = {};
@@ -98,6 +118,22 @@ export async function siteDb(): Promise<SiteSql> {
   }
 
   return sqliteSite();
+}
+
+export async function catalogRank(): Promise<EdgeStub | null> {
+  const env = await cloudflareEnv();
+
+  const namespace = env?.CATALOG_RANK;
+
+  if (!namespace) {
+    return null;
+  }
+
+  const id = namespace.idFromName("catalog");
+
+  return namespace.get(id, {
+    locationHint: "eeur",
+  });
 }
 
 export async function iconEmbed(): Promise<IconEmbedNamespace | null> {
