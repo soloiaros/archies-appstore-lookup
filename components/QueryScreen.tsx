@@ -481,10 +481,10 @@ export function QueryScreen({
                   aria-hidden={outputShown || undefined}
                   inert={outputShown || undefined}
                 >
-                  <h1>Name an app feature.</h1>
+                  <h1>AppStore success stories.</h1>
 
                   <p className="stage-sub">
-                    Get all matching apps on the AppStore.
+                    All top-chart level apps, one search away with Jev x 10k.
                   </p>
 
                   <LiveStats />

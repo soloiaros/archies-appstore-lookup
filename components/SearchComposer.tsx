@@ -7,6 +7,33 @@ import {
   useState,
 } from "react";
 
+const PROMPTS = [
+  "Show me the apps with a dog logo.",
+  "Show me sport related apps with the most revenue in 2026.",
+  "i'm building a cooking app with an ai assistant, show my competitors.",
+  "I need some ideas for a mascot icon.",
+  "Show me quirky apps with the most unique visual style/features.",
+  "i'm building a niche camera app, show me what's out there already.",
+  "Find meditation apps with the highest ratings.",
+  "I'm looking for a journaling app with a paper texture.",
+  "Compare Notion and Obsidian.",
+  "habit trackers with streaks and a clean interface",
+] as const;
+
+const FALLBACK = PROMPTS[0];
+
+const TYPE_MS = 46;
+
+const DELETE_MS = 24;
+
+const HOLD_MS = 1800;
+
+const GAP_MS = 420;
+
+function jitter(base: number, spread: number) {
+  return base + Math.floor((Math.random() * 2 - 1) * spread);
+}
+
 type Props = {
   value: string;
 
@@ -29,6 +56,16 @@ export function SearchComposer({
   const input = useRef<HTMLInputElement>(null);
 
   const [ready, setReady] = useState(false);
+
+  const [hint, setHint] = useState(FALLBACK);
+
+  const [focused, setFocused] = useState(false);
+
+  const promptAt = useRef(0);
+
+  const empty = value.trim().length === 0;
+
+  const animate = ready && empty && !focused;
 
   useEffect(() => {
     setReady(true);
@@ -61,6 +98,81 @@ export function SearchComposer({
     };
   }, []);
 
+  useEffect(() => {
+    if (!animate) {
+      return;
+    }
+
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+
+    if (reduce.matches) {
+      setHint(FALLBACK);
+      return;
+    }
+
+    const signal = { dead: false };
+
+    let timer = 0;
+
+    const wait = (ms: number) =>
+      new Promise<void>((resolve) => {
+        timer = window.setTimeout(resolve, ms);
+      });
+
+    const run = async () => {
+      while (!signal.dead) {
+        const prompt = PROMPTS[promptAt.current % PROMPTS.length];
+
+        promptAt.current += 1;
+
+        for (let i = 1; i <= prompt.length; i++) {
+          if (signal.dead) {
+            return;
+          }
+
+          setHint(prompt.slice(0, i));
+
+          await wait(jitter(TYPE_MS, 14));
+        }
+
+        if (signal.dead) {
+          return;
+        }
+
+        await wait(HOLD_MS);
+
+        if (signal.dead) {
+          return;
+        }
+
+        for (let i = prompt.length - 1; i >= 0; i--) {
+          if (signal.dead) {
+            return;
+          }
+
+          setHint(prompt.slice(0, i));
+
+          await wait(jitter(DELETE_MS, 8));
+        }
+
+        if (signal.dead) {
+          return;
+        }
+
+        await wait(GAP_MS);
+      }
+    };
+
+    void run();
+
+    return () => {
+      signal.dead = true;
+      window.clearTimeout(timer);
+    };
+  }, [animate]);
+
   const submit = () => {
     onSubmit(input.current?.value ?? value);
   };
@@ -83,13 +195,18 @@ export function SearchComposer({
       <input
         id="q"
         ref={input}
-        autoFocus
         autoComplete="off"
         spellCheck={false}
         maxLength={300}
         value={value}
         onChange={(event) => {
           onChange(event.target.value);
+        }}
+        onFocus={() => {
+          setFocused(true);
+        }}
+        onBlur={() => {
+          setFocused(false);
         }}
         onKeyDown={(event) => {
           if (
@@ -105,7 +222,7 @@ export function SearchComposer({
             input.current?.blur();
           }
         }}
-        placeholder="Describe an app"
+        placeholder={focused ? "" : hint}
       />
 
       <button
