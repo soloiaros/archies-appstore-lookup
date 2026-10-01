@@ -1,4 +1,11 @@
-import { tooMany, underLimit } from "@/lib/site/limit";
+import { applyCookies, visitIds } from "@/lib/site/http";
+
+import { underLimit, tooMany } from "@/lib/site/limit";
+
+import {
+  quotaExceeded,
+  takeDailyQuery,
+} from "@/lib/site/quota";
 
 import { answer } from "@/lib/router";
 
@@ -29,18 +36,35 @@ export async function POST(
     );
   }
 
-  const allowed = await underLimit(request, "query", 50);
+  const visits = visitIds(request);
 
-  if (!allowed) {
-    return tooMany(
-      "Too many searches from this network. Try again in an hour.",
+  const burstOk = await underLimit(request, "query", 50);
+
+  if (!burstOk) {
+    return applyCookies(
+      tooMany(
+        "Too many searches from this network. Try again in an hour.",
+      ),
+      visits.cookies,
     );
+  }
+
+  const daily = await takeDailyQuery(request, visits.ids.vid);
+
+  if (!daily.ok) {
+    return applyCookies(quotaExceeded(daily.quota), visits.cookies);
   }
 
   try {
     const result = await answer(query);
 
-    return Response.json(result);
+    return applyCookies(
+      Response.json({
+        ...result,
+        quota: daily.quota,
+      }),
+      visits.cookies,
+    );
   } catch (error) {
     const raw = error instanceof Error
       ? error.message
@@ -50,9 +74,12 @@ export async function POST(
       ? "The app catalog is not available on this server."
       : raw;
 
-    return Response.json(
-      { error: message },
-      { status: 500 },
+    return applyCookies(
+      Response.json(
+        { error: message },
+        { status: 500 },
+      ),
+      visits.cookies,
     );
   }
 }

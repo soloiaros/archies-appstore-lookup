@@ -2630,6 +2630,227 @@ button.home-footer-link {
   transform: scale(1.12) rotate(-8deg);
 }
 
+.auth-control {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.auth-key {
+  width: 1.95rem;
+  min-height: 1.95rem;
+  padding: 0;
+  color: var(--color-muted);
+}
+
+.auth-key svg,
+.auth-key-initial,
+.auth-key-avatar {
+  transition: transform var(--neo-press);
+}
+
+.auth-key:hover {
+  color: var(--color-text);
+}
+
+.auth-key:hover svg,
+.auth-key:hover .auth-key-initial,
+.auth-key:hover .auth-key-avatar {
+  transform: scale(1.1);
+}
+
+.auth-key-avatar {
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.auth-key-initial {
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.auth-popover {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  z-index: 60;
+  min-width: 14.5rem;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 220ms var(--ease-premium),
+    transform 220ms var(--ease-premium);
+}
+
+.auth-popover[data-open="true"] {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.auth-popover-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--neo-well);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+.auth-menu-label {
+  margin: 0.15rem 0.45rem 0.2rem;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.auth-menu-meta {
+  margin: 0.2rem 0.45rem 0.35rem;
+  color: var(--color-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: -0.005em;
+}
+
+.auth-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 160ms var(--ease-premium),
+    color 160ms var(--ease-premium);
+}
+
+.auth-menu-item:hover {
+  background: var(--neo-key);
+  color: var(--color-text);
+}
+
+.auth-menu-item[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.auth-menu-item[data-disabled="true"]:hover {
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.site-menu-auth {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.auth-menu-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding-inline: 0.15rem;
+}
+
+.profile-page {
+  display: flex;
+  justify-content: center;
+  padding-block: 3rem 4rem;
+}
+
+.profile-card {
+  width: min(100%, 28rem);
+  padding: 1.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  background: var(--neo-well);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 12px 32px rgb(0 0 0 / 0.28);
+  animation: rise 0.55s var(--ease-premium) both;
+}
+
+.profile-kicker {
+  margin: 0;
+  color: var(--color-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-card h1 {
+  margin: 0.35rem 0 1rem;
+  font-size: 1.6rem;
+  letter-spacing: -0.03em;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.profile-avatar,
+.profile-avatar-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.profile-avatar {
+  object-fit: cover;
+}
+
+.profile-avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--neo-key);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.profile-name {
+  margin: 0;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.profile-copy {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.profile-card .ui-key-solid {
+  margin-top: 1.25rem;
+}
+
 .stage-head {
   pointer-events: auto;
   position: absolute;

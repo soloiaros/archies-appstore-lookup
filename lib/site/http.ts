@@ -40,6 +40,17 @@ function bake(
   return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
 }
 
+export function readVid(request: Request) {
+  const header = request.headers.get("cookie") ?? "";
+  const value = readCookie(header, "vid");
+
+  if (value && ID.test(value)) {
+    return value.toLowerCase();
+  }
+
+  return null;
+}
+
 export function visitIds(request: Request): {
   ids: VisitIds;
 

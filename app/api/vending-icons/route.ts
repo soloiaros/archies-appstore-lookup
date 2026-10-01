@@ -28,33 +28,40 @@ export async function GET(request: Request) {
   const remote = await catalogDb();
 
   if (remote) {
-    const rows = await remote.all<{
-      trackId: number;
-      name: string;
-    }>(
-      `
-      select
-        track_id as trackId,
-        name
-      from apps
-      where delisted = 0
-        and icon_url != ''
-      order by track_id
-      limit ?
-      `,
-      [limit],
-    );
+    try {
+      const rows = await remote.all<{
+        trackId: number;
+        name: string;
+      }>(
+        `
+        select
+          track_id as trackId,
+          name
+        from apps
+        where delisted = 0
+          and icon_url != ''
+        order by track_id
+        limit ?
+        `,
+        [limit],
+      );
 
-    const icons = rows.map((row) => ({
-      trackId: Number(row.trackId),
-      name: String(row.name),
-      src: `/api/vending-icons/${row.trackId}`,
-    }));
+      const icons = rows.map((row) => ({
+        trackId: Number(row.trackId),
+        name: String(row.name),
+        src: `/api/vending-icons/${row.trackId}`,
+      }));
 
-    return NextResponse.json({
-      count: icons.length,
-      icons,
-    });
+      return NextResponse.json({
+        count: icons.length,
+        icons,
+      });
+    } catch (error) {
+      console.warn(
+        "vending-icons: remote catalog failed, falling back to local sqlite",
+        error,
+      );
+    }
   }
 
   const db = openCatalog();

@@ -6,6 +6,8 @@ import Link from "next/link";
 
 import { usePathname } from "next/navigation";
 
+import { AuthControl } from "@/components/AuthControl";
+
 import { PageBeacon } from "@/components/PageBeacon";
 
 import { Key } from "@/components/ui/Key";
@@ -289,6 +291,8 @@ export function SiteHeader() {
                 />
               </svg>
             </a>
+
+            <AuthControl variant="header" />
           </div>
 
           <button
@@ -420,6 +424,10 @@ export function SiteHeader() {
                   </a>
                 </li>
               </ul>
+
+              <div className="site-menu-auth">
+                <AuthControl variant="menu" />
+              </div>
             </nav>
 
             <div

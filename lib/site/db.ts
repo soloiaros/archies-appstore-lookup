@@ -65,7 +65,20 @@ type CfEnv = {
 
 const d1Token = {};
 
+function onCloudflareWorkers() {
+  return typeof navigator !== "undefined"
+    && navigator.userAgent === "Cloudflare-Workers";
+}
+
 async function cloudflareEnv(): Promise<CfEnv | null> {
+  // Local `next dev` must keep using data/*.sqlite. Calling
+  // getCloudflareContext() (e.g. from auth) can install a proxy env that
+  // points catalog reads at D1 without the apps table — only trust CF env
+  // when we are actually on Workers.
+  if (!onCloudflareWorkers()) {
+    return null;
+  }
+
   const global = globalThis as typeof globalThis & {
     [key: symbol]: { env?: CfEnv } | undefined;
   };
@@ -74,13 +87,6 @@ async function cloudflareEnv(): Promise<CfEnv | null> {
 
   if (existing?.env) {
     return existing.env;
-  }
-
-  const onWorkers = typeof navigator !== "undefined"
-    && navigator.userAgent === "Cloudflare-Workers";
-
-  if (!onWorkers) {
-    return null;
   }
 
   try {

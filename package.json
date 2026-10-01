@@ -29,6 +29,7 @@
     "@cloudflare/containers": "^0.3.7",
     "@huggingface/transformers": "^4.3.0",
     "@opennextjs/cloudflare": "^1.20.6",
+    "better-auth": "^1.7.7",
     "border-beam": "^1.4.1",
     "cn": "^0.4.0",
     "geist": "^1.7.2",
