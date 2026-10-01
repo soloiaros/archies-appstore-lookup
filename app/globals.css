@@ -3043,6 +3043,18 @@ button.home-footer-link {
   font-size: 0.9rem;
 }
 
+.legal-copy p {
+  margin: 0.7rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.legal-copy h2 + p {
+  margin-top: 0.55rem;
+}
+
 .board-foot {
   margin-top: 1.5rem;
 }

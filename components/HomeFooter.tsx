@@ -19,6 +19,14 @@ const LINKS = [
     href: "/how-to-use",
     label: "How to use",
   },
+  {
+    href: "/privacy",
+    label: "Privacy",
+  },
+  {
+    href: "/terms",
+    label: "Terms",
+  },
 ] as const;
 
 
