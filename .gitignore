@@ -43,19 +43,9 @@ next-env.d.ts
 .aider-desk/
 skills-lock.json
 
-.agents/skills/appllama-app-design-skill/
-.agents/skills/appllama-usage/
-.agents/skills/paddle-billing-history/
-.agents/skills/paddle-catalog-setup/
-.agents/skills/paddle-checkout-web/
-.agents/skills/paddle-customer-portal/
-.agents/skills/paddle-pricing-pages/
-.agents/skills/paddle-sandbox-testing/
-.agents/skills/paddle-subscription-cancel/
-.agents/skills/paddle-subscription-sync/
-.agents/skills/paddle-subscription-update/
-.agents/skills/paddle-webhooks/
-.agents/skills/vercel-react-view-transitions/
+.agents/
+AGENTS.md
+.cursor/rules/
 
 .cursor/*.png
 .cursor/*.log
