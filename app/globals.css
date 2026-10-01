@@ -435,13 +435,6 @@ html:has(.search-lock) body {
   text-wrap: pretty;
 }
 
-.account-promo-soon {
-  color: var(--color-faint);
-  font-family: var(--font-mono);
-  font-size: 0.78em;
-  letter-spacing: -0.01em;
-}
-
 .account-promo-cta {
   align-self: stretch;
   min-height: 2.35rem;

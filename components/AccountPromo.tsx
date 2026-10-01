@@ -97,9 +97,7 @@ export function AccountPromo({ armed }: Props) {
       >
         Sign in with GitHub and get {USER_DAILY_LIMIT} free queries a day
         ({GUEST_DAILY_LIMIT} without an account), plus the ability to use your
-        own Jev key for unlimited free queries
-        {" "}
-        <span className="account-promo-soon">(coming soon)</span>.
+        own Jev key for unlimited free queries (coming soon).
       </p>
 
       <button
