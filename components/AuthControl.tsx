@@ -157,6 +157,18 @@ export function AuthControl({
 
   useEffect(() => {
     void refreshQuota();
+
+    const onQuota = () => {
+      void refreshQuota();
+    };
+
+    window.addEventListener("focus", onQuota);
+    window.addEventListener("10k-quota", onQuota);
+
+    return () => {
+      window.removeEventListener("focus", onQuota);
+      window.removeEventListener("10k-quota", onQuota);
+    };
   }, [refreshQuota, user?.id]);
 
   useEffect(() => {
@@ -206,7 +218,7 @@ export function AuthControl({
           <>
             <p className="auth-menu-label">Sign in</p>
             <p className="auth-menu-meta">
-              {GUEST_DAILY_LIMIT}/day free · {USER_DAILY_LIMIT}/day with an account
+              {remaining}/{limit} free daily queries left.
             </p>
             <ProviderButtons onPick={() => undefined} />
           </>
@@ -271,7 +283,7 @@ export function AuthControl({
             <>
               <p className="auth-menu-label">Sign in</p>
               <p className="auth-menu-meta">
-                {GUEST_DAILY_LIMIT}/day free · {USER_DAILY_LIMIT}/day with an account
+                {remaining}/{limit} free daily queries left.
               </p>
               <ProviderButtons onPick={() => setOpen(false)} />
             </>

@@ -98,6 +98,8 @@ export function useQuery() {
           phase: "done",
           answer: data,
         });
+
+        window.dispatchEvent(new Event("10k-quota"));
       } catch {
         setState({
           phase: "error",
