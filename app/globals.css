@@ -107,6 +107,56 @@ html:has(.search-lock) body {
   border: 0;
 }
 
+.mobile-fire {
+  pointer-events: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42%;
+  z-index: 0;
+  overflow: hidden;
+  /* Soft top so the canvas never meets the page ink on a hard line. */
+  -webkit-mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 48%,
+    rgb(0 0 0 / 0.55) 72%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to top,
+    #000 0%,
+    #000 48%,
+    rgb(0 0 0 / 0.55) 72%,
+    transparent 100%
+  );
+}
+
+.mobile-bg-dim {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-premium);
+}
+
+.mobile-bg-dim[data-on="true"] {
+  opacity: 1;
+}
+
+.mobile-bg-frost,
+.mobile-bg-wash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mobile-bg-wash {
+  background: rgb(11 11 12 / 0.62);
+}
+
 .stage-layer {
   pointer-events: none;
   position: fixed;
@@ -2429,9 +2479,14 @@ button.home-footer-link {
     -webkit-backdrop-filter: none;
   }
 
-  .site-menu-frost {
+  .site-menu-frost,
+  .mobile-bg-frost {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+  }
+
+  .mobile-bg-dim {
+    transition: none !important;
   }
 
 

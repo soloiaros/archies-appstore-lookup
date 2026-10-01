@@ -44,6 +44,9 @@ type Props = {
   onClear: () => void;
 
   busy: boolean;
+
+  /** Swap the submit control for a clear control (same as Escape). */
+  clearable?: boolean;
 };
 
 export function SearchComposer({
@@ -52,6 +55,7 @@ export function SearchComposer({
   onSubmit,
   onClear,
   busy,
+  clearable = false,
 }: Props) {
   const input = useRef<HTMLInputElement>(null);
 
@@ -177,11 +181,17 @@ export function SearchComposer({
     onSubmit(input.current?.value ?? value);
   };
 
+  const clear = () => {
+    onClear();
+    input.current?.blur();
+  };
+
   const form = (
     <form
       role="search"
       data-ready={ready ? "true" : "false"}
       data-busy={busy ? "true" : "false"}
+      data-clearable={clearable ? "true" : "false"}
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -218,29 +228,38 @@ export function SearchComposer({
           }
 
           if (event.key === "Escape") {
-            onClear();
-            input.current?.blur();
+            clear();
           }
         }}
         placeholder={focused ? "" : hint}
       />
 
-      <button
-        type="submit"
-        disabled={
-          ready
-            ? busy || value.trim().length < 2
-            : false
-        }
-        aria-label={
-          busy
-            ? "Searching"
-            : "Search"
-        }
-        data-busy={busy ? "true" : "false"}
-      >
-        ↑
-      </button>
+      {clearable ? (
+        <button
+          type="button"
+          aria-label="Clear"
+          onClick={clear}
+        >
+          ×
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={
+            ready
+              ? busy || value.trim().length < 2
+              : false
+          }
+          aria-label={
+            busy
+              ? "Searching"
+              : "Search"
+          }
+          data-busy={busy ? "true" : "false"}
+        >
+          ↑
+        </button>
+      )}
     </form>
   );
 

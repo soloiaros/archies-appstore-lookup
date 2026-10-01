@@ -44,6 +44,8 @@ import { SearchComposer } from "@/components/SearchComposer";
 
 import { StoreMark } from "@/components/ui/StoreMark";
 
+import { ShaderAnimeFire } from "@/components/ui/shader-anime-fire";
+
 import type { MatchPick } from "@/components/floor/overlays";
 
 import type { Sheet } from "@/components/floor/atlas";
@@ -495,6 +497,47 @@ export function QueryScreen({
       />
       ) : null}
 
+      {pileCap === 0 ? (
+        <>
+          <div className="mobile-fire" aria-hidden>
+            <ShaderAnimeFire
+              theme="dark"
+              height={0.7}
+              intensity={0.9}
+              paused={outputShown}
+            />
+          </div>
+          <div
+            className="mobile-bg-dim"
+            data-on={outputShown ? "true" : "false"}
+            aria-hidden
+          >
+            <span
+              className="mobile-bg-frost"
+              style={{
+                backdropFilter: "blur(32px)",
+                WebkitBackdropFilter: "blur(32px)",
+              }}
+            />
+            <span
+              className="mobile-bg-frost"
+              style={{
+                backdropFilter: "blur(16px)",
+                WebkitBackdropFilter: "blur(16px)",
+              }}
+            />
+            <span
+              className="mobile-bg-frost"
+              style={{
+                backdropFilter: "blur(6px)",
+                WebkitBackdropFilter: "blur(6px)",
+              }}
+            />
+            <span className="mobile-bg-wash" />
+          </div>
+        </>
+      ) : null}
+
       {detail ? (
         <AppDetail
           detail={detail}
@@ -538,6 +581,7 @@ export function QueryScreen({
                     floor.current?.ghost(null);
                   }}
                   busy={busy}
+                  clearable={outputShown}
                 />
 
                 <div className="indexed-line">
