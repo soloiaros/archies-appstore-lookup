@@ -97,7 +97,7 @@ function AccountItems({
         aria-disabled
         data-disabled="true"
       >
-        Saved
+        Saved (coming soon)
       </span>
       <p className="auth-menu-meta">
         Free daily queries: {remaining}/{limit}
