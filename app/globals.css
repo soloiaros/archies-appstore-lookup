@@ -356,6 +356,106 @@ html:has(.search-lock) body {
   cursor: pointer;
 }
 
+.account-promo {
+  pointer-events: none;
+  position: fixed;
+  z-index: 47;
+  top: calc(var(--header-h, 3.25rem) + 0.75rem);
+  right: var(--page-gutter);
+  width: min(22.5rem, calc(100vw - 1.5rem));
+}
+
+.account-promo-beam {
+  display: block;
+  width: 100%;
+  pointer-events: auto;
+}
+
+.account-promo-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.05rem 1.1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 16px;
+  background: rgb(14 14 16 / 0.72);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 18px 40px -20px rgb(0 0 0 / 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.account-promo-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.account-promo-kicker {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.account-promo-close {
+  display: grid;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  flex-shrink: 0;
+  margin: -0.15rem -0.2rem 0 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--neo-key);
+  color: var(--color-muted);
+  box-shadow:
+    inset 0 1px 0 var(--neo-hi),
+    inset 0 -1px 0 var(--neo-shade);
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.account-promo-close:hover {
+  color: var(--color-text);
+}
+
+.account-promo-copy {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.account-promo-soon {
+  color: var(--color-faint);
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  letter-spacing: -0.01em;
+}
+
+.account-promo-cta {
+  align-self: stretch;
+  min-height: 2.35rem;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .account-promo {
+    left: 12px;
+    right: 12px;
+    width: auto;
+  }
+}
+
 .panel-frame {
   position: relative;
   box-sizing: border-box;

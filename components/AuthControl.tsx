@@ -51,36 +51,20 @@ function ProviderButtons({
   onPick: () => void;
 }) {
   return (
-    <>
-      <button
-        type="button"
-        className="auth-menu-item"
-        onClick={() => {
-          playButtonSound();
-          onPick();
-          void signIn.social({
-            provider: "google",
-            callbackURL: "/",
-          });
-        }}
-      >
-        Continue with Google
-      </button>
-      <button
-        type="button"
-        className="auth-menu-item"
-        onClick={() => {
-          playButtonSound();
-          onPick();
-          void signIn.social({
-            provider: "github",
-            callbackURL: "/",
-          });
-        }}
-      >
-        Continue with GitHub
-      </button>
-    </>
+    <button
+      type="button"
+      className="auth-menu-item"
+      onClick={() => {
+        playButtonSound();
+        onPick();
+        void signIn.social({
+          provider: "github",
+          callbackURL: "/",
+        });
+      }}
+    >
+      Continue with GitHub
+    </button>
   );
 }
 

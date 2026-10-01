@@ -46,6 +46,8 @@ import { StoreMark } from "@/components/ui/StoreMark";
 
 import { ShaderAnimeFire } from "@/components/ui/shader-anime-fire";
 
+import { AccountPromo } from "@/components/AccountPromo";
+
 import type { MatchPick } from "@/components/floor/overlays";
 
 import type { Sheet } from "@/components/floor/atlas";
@@ -627,6 +629,8 @@ export function QueryScreen({
               ) : null}
             </NoticeSurface>
           ) : null}
+
+          <AccountPromo armed={state.phase === "done"} />
 
           {state.phase === "done"
           && route === "factual"
