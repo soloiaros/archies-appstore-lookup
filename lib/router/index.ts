@@ -10,7 +10,7 @@ import { loadLocalEnv } from "@/lib/env";
 
 import { deepenCandidates } from "@/lib/catalog/vectors";
 
-import { catalogDb } from "@/lib/site/db";
+import { catalogDb, useLocalSqlite } from "@/lib/site/db";
 
 import { answerComparative } from "@/lib/router/comparative";
 
@@ -28,6 +28,10 @@ export async function answer(
   const shape = classify(query);
 
   const remote = await catalogDb();
+
+  if (!remote && !useLocalSqlite()) {
+    throw new Error("The app catalog is not available on this server.");
+  }
 
   const catalog = remote
     ? cloudCatalog(remote)

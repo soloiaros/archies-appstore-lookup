@@ -65,17 +65,24 @@ type CfEnv = {
 
 const d1Token = {};
 
-function onCloudflareWorkers() {
-  return typeof navigator !== "undefined"
-    && navigator.userAgent === "Cloudflare-Workers";
+/**
+ * Prefer data/*.sqlite for local `next dev`.
+ * OpenNext can install a wrangler proxy into the Node process; that must not
+ * steal catalog/site reads. Production / workerd always uses bindings.
+ */
+export function useLocalSqlite() {
+  if (
+    typeof navigator !== "undefined"
+    && navigator.userAgent === "Cloudflare-Workers"
+  ) {
+    return false;
+  }
+
+  return process.env.NODE_ENV !== "production";
 }
 
 async function cloudflareEnv(): Promise<CfEnv | null> {
-  // Local `next dev` must keep using data/*.sqlite. Calling
-  // getCloudflareContext() (e.g. from auth) can install a proxy env that
-  // points catalog reads at D1 without the apps table — only trust CF env
-  // when we are actually on Workers.
-  if (!onCloudflareWorkers()) {
+  if (useLocalSqlite()) {
     return null;
   }
 

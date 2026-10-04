@@ -8,6 +8,8 @@ import { betterAuth } from "better-auth";
 
 import { nextCookies } from "better-auth/next-js";
 
+import { useLocalSqlite } from "@/lib/site/db";
+
 function socialProviders() {
   const providers: {
     github?: { clientId: string; clientSecret: string };
@@ -72,6 +74,9 @@ type D1DatabaseLike = {
 };
 
 let localDb: DatabaseSync | null = null;
+let localAuthInstance: ReturnType<typeof createAuth> | null = null;
+let workersAuthInstance: ReturnType<typeof createAuth> | null = null;
+let workersAuthDb: D1DatabaseLike | null = null;
 
 function localDatabase() {
   if (!localDb) {
@@ -83,17 +88,31 @@ function localDatabase() {
   return localDb;
 }
 
-/** Sync instance for the Better Auth CLI (`npx auth migrate`). */
-export const auth = createAuth(localDatabase());
+function localAuth() {
+  if (!localAuthInstance) {
+    localAuthInstance = createAuth(localDatabase());
+  }
+
+  return localAuthInstance;
+}
+
+/**
+ * Sync instance for the Better Auth CLI (`npx auth migrate`).
+ * Lazily opens local sqlite so Workers never touch the filesystem at import.
+ */
+export const auth = new Proxy({} as ReturnType<typeof createAuth>, {
+  get(_target, property, receiver) {
+    const instance = localAuth();
+    const value = Reflect.get(instance, property, receiver);
+    return typeof value === "function" ? value.bind(instance) : value;
+  },
+});
 
 export type Auth = typeof auth;
 
 export async function getAuth(): Promise<Auth> {
-  const onWorkers = typeof navigator !== "undefined"
-    && navigator.userAgent === "Cloudflare-Workers";
-
-  if (!onWorkers) {
-    return auth;
+  if (useLocalSqlite()) {
+    return localAuth() as Auth;
   }
 
   try {
@@ -105,13 +124,20 @@ export async function getAuth(): Promise<Auth> {
       // Ensure Better Auth tables exist on SITE_DB (same path as rate limits).
       const { siteDb } = await import("@/lib/site/db");
       await siteDb();
-      return createAuth(db) as Auth;
+
+      if (workersAuthInstance && workersAuthDb === db) {
+        return workersAuthInstance as Auth;
+      }
+
+      workersAuthDb = db;
+      workersAuthInstance = createAuth(db);
+      return workersAuthInstance as Auth;
     }
   } catch {
-    // Fall through to local sqlite auth.
+    // Fall through to local sqlite auth (dev / missing binding).
   }
 
-  return auth;
+  return localAuth() as Auth;
 }
 
 export async function getSession(headers: Headers) {

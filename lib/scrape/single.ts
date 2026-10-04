@@ -15,6 +15,15 @@ import {
 
 import type { AppMetadata } from "@/models/app";
 
+function localCatalogOrNull() {
+  try {
+    return openCatalog();
+  } catch {
+    // Workers / edge cannot open data/catalog.sqlite.
+    return null;
+  }
+}
+
 export async function refreshOneApp(
   trackId: number,
   country = itunesCountry(),
@@ -26,51 +35,61 @@ export async function refreshOneApp(
 
   const hit = results[0];
 
-  const db = openCatalog();
+  if (!hit) {
+    const db = localCatalogOrNull();
 
-  try {
-    if (!hit) {
-      db.prepare(`
-        update apps
-        set delisted = 1
-        where track_id = ?
-      `).run(trackId);
-
-      return null;
+    if (db) {
+      try {
+        db.prepare(`
+          update apps
+          set delisted = 1
+          where track_id = ?
+        `).run(trackId);
+      } finally {
+        db.close();
+      }
     }
 
-    const observedAt = new Date().toISOString();
-
-    const app = toAppMetadata(
-      hit,
-      observedAt,
-    );
-
-    const rating = toRatingSnapshot(
-      hit,
-      observedAt,
-    );
-
-    const version = toVersionRelease(hit);
-
-    upsertObserved(
-      db,
-      {
-        apps: [app],
-        ratings: rating
-          ? [rating]
-          : [],
-        charts: [],
-        versions: version
-          ? [version]
-          : [],
-      },
-    );
-
-    return app;
-  } finally {
-    db.close();
+    return null;
   }
+
+  const observedAt = new Date().toISOString();
+
+  const app = toAppMetadata(
+    hit,
+    observedAt,
+  );
+
+  const rating = toRatingSnapshot(
+    hit,
+    observedAt,
+  );
+
+  const version = toVersionRelease(hit);
+
+  const db = localCatalogOrNull();
+
+  if (db) {
+    try {
+      upsertObserved(
+        db,
+        {
+          apps: [app],
+          ratings: rating
+            ? [rating]
+            : [],
+          charts: [],
+          versions: version
+            ? [version]
+            : [],
+        },
+      );
+    } finally {
+      db.close();
+    }
+  }
+
+  return app;
 }
 
 export async function lookupByName(

@@ -39,17 +39,25 @@ export async function answerFactual(
   let app = await catalog.findByName(query);
 
   if (app && isStale(app.metadataFetchedAt, METADATA_MAX_AGE_MS)) {
-    const refreshed = await refreshOneApp(
-      app.trackId,
-    );
+    try {
+      const refreshed = await refreshOneApp(
+        app.trackId,
+      );
 
-    if (refreshed) {
-      app = refreshed;
+      if (refreshed) {
+        app = refreshed;
+      }
+    } catch {
+      // Keep the catalog row when live refresh is unavailable.
     }
   }
 
   if (!app) {
-    app = await lookupByName(query);
+    try {
+      app = await lookupByName(query);
+    } catch {
+      app = null;
+    }
   }
 
   if (!app) {

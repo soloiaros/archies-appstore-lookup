@@ -6,7 +6,7 @@ import {
   type QuotaSnapshot,
 } from "@/lib/quota";
 
-import { clientIp, readVid } from "@/lib/site/http";
+import { clientIp } from "@/lib/site/http";
 
 import { siteDb } from "@/lib/site/db";
 
@@ -28,13 +28,9 @@ export function utcDayStart(now = Date.now()) {
   );
 }
 
-function guestKey(request: Request, vid?: string | null) {
-  const id = vid || readVid(request);
-
-  if (id) {
-    return `g:${id}`;
-  }
-
+function guestKey(request: Request, _vid?: string | null) {
+  // Guests are limited by client IP. Cookie-only keys are trivial to reset
+  // by deleting `vid`; IP is the durable guest identity at this tier.
   return `g:${clientIp(request).slice(0, 64)}`;
 }
 
@@ -129,9 +125,16 @@ export async function takeDailyQuery(
 
     return { ok: true, quota };
   } catch {
-    // Fail open only for infrastructure errors; still report nominal quota.
-    const quota = await quotaFor(request, vid);
-    return { ok: true, quota };
+    // Fail closed: do not grant free searches when the limiter is down.
+    const quota: QuotaSnapshot = {
+      authenticated,
+      limit,
+      used: limit,
+      remaining: 0,
+      resetsAt: windowStart + DAY_MS,
+    };
+
+    return { ok: false, quota };
   }
 }
 

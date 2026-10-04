@@ -34,7 +34,8 @@ export async function underLimit(
 
     return hits <= limit;
   } catch {
-    return true;
+    // Fail closed when the limiter cannot write.
+    return false;
   }
 }
 
