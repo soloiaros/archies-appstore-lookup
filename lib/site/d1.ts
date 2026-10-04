@@ -46,6 +46,29 @@ export function fromD1(db: D1Database): SiteSql {
 
 const ready = new WeakSet<object>();
 
+const PAGEVIEW_COLUMNS = [
+  ["city", "text"],
+  ["region", "text"],
+  ["lat", "real"],
+  ["lon", "real"],
+] as const;
+
+async function migratePageviews(sql: SiteSql) {
+  const columns = await sql.all<{ name: string }>(
+    "pragma table_info(pageviews)",
+  );
+
+  const have = new Set(columns.map((column) => column.name));
+
+  for (const [name, type] of PAGEVIEW_COLUMNS) {
+    if (have.has(name)) {
+      continue;
+    }
+
+    await sql.exec(`alter table pageviews add column ${name} ${type}`);
+  }
+}
+
 export async function ensureSchema(
   sql: SiteSql,
   token: object,
@@ -62,6 +85,8 @@ export async function ensureSchema(
   for (const statement of statements) {
     await sql.exec(statement);
   }
+
+  await migratePageviews(sql);
 
   ready.add(token);
 }

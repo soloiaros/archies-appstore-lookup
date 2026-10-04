@@ -4,6 +4,10 @@ create table if not exists pageviews (
   ts integer not null,
   path text not null,
   country text,
+  city text,
+  region text,
+  lat real,
+  lon real,
   referrer_host text,
   vid text not null,
   sid text not null

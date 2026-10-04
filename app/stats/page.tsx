@@ -4,6 +4,8 @@ import { HereNow } from "@/components/HereNow";
 
 import { SectionPage } from "@/components/DirectionalPage";
 
+import { VisitorMap } from "@/components/VisitorMap";
+
 import { Key } from "@/components/ui/Key";
 
 import { loadStats } from "@/lib/site/stats";
@@ -150,6 +152,12 @@ export default async function StatsPage({
         </section>
 
         <section className="board-block">
+          <h2>Where people fire up 10K</h2>
+
+          <VisitorMap places={report.places} />
+        </section>
+
+        <section className="board-block">
           <h2>
             Visitors per day
             <span>
@@ -192,24 +200,6 @@ export default async function StatsPage({
               <span>{last ? dayLabel.format(last.ts) : ""}</span>
             </div>
           </div>
-        </section>
-
-        <section className="board-block">
-          <h2>Top pages</h2>
-
-          <Bars
-            rows={report.pages}
-            name={(row) => row.label}
-          />
-        </section>
-
-        <section className="board-block">
-          <h2>Referrers</h2>
-
-          <Bars
-            rows={report.referrers}
-            name={(row) => row.label}
-          />
         </section>
 
         <section className="board-block">

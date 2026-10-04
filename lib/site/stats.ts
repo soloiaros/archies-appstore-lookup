@@ -1,5 +1,11 @@
 import { siteDb } from "@/lib/site/db";
 
+import {
+  countryCentroid,
+  placeLabel,
+  type MapPlace,
+} from "@/lib/site/place";
+
 import { regionFlag, regionName } from "@/lib/site/region";
 
 const DAY = 86_400_000;
@@ -38,6 +44,8 @@ export type StatsReport = {
   referrers: CountRow[];
 
   countries: Array<CountRow & { code: string; flag: string }>;
+
+  places: MapPlace[];
 };
 
 function windowStart(days: number, now: number) {
@@ -59,6 +67,14 @@ export async function recordView(input: {
 
   country: string | null;
 
+  city?: string | null;
+
+  region?: string | null;
+
+  lat?: number | null;
+
+  lon?: number | null;
+
   referrerHost: string | null;
 
   vid: string;
@@ -73,15 +89,23 @@ export async function recordView(input: {
       ts,
       path,
       country,
+      city,
+      region,
+      lat,
+      lon,
       referrer_host,
       vid,
       sid
-    ) values (?, ?, ?, ?, ?, ?)
+    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       Date.now(),
       input.path,
       input.country,
+      input.city ?? null,
+      input.region ?? null,
+      input.lat ?? null,
+      input.lon ?? null,
       input.referrerHost,
       input.vid,
       input.sid,
@@ -191,6 +215,83 @@ export async function loadStats(
     [start],
   );
 
+  const placed = await sql.all<{
+    city: string;
+    region: string;
+    country: string;
+    lat: number;
+    lon: number;
+    n: number;
+  }>(
+    `
+    select
+      coalesce(city, '') as city,
+      coalesce(region, '') as region,
+      coalesce(country, '') as country,
+      lat,
+      lon,
+      count(distinct vid) as n
+    from pageviews
+    where ts >= ?
+      and lat is not null
+      and lon is not null
+    group by city, region, country, lat, lon
+    order by n desc
+    limit 120
+    `,
+    [start],
+  );
+
+  const places: MapPlace[] = [];
+
+  if (placed.length > 0) {
+    for (const row of placed) {
+      const named = placeLabel({
+        city: row.city || null,
+        region: row.region || null,
+        countryName: regionName(row.country),
+        country: row.country || null,
+      });
+
+      places.push({
+        id: [
+          row.country,
+          row.region,
+          row.city,
+          row.lat.toFixed(2),
+          row.lon.toFixed(2),
+        ].join("|"),
+        label: named.label,
+        detail: named.detail,
+        lat: Number(row.lat),
+        lon: Number(row.lon),
+        n: row.n,
+      });
+    }
+  } else {
+    // Older rows only have country codes — show coarse country dots.
+    for (const row of countries) {
+      if (!row.code) {
+        continue;
+      }
+
+      const centroid = countryCentroid(row.code);
+
+      if (!centroid) {
+        continue;
+      }
+
+      places.push({
+        id: `country:${row.code}`,
+        label: regionName(row.code),
+        detail: null,
+        lon: centroid[0],
+        lat: centroid[1],
+        n: row.n,
+      });
+    }
+  }
+
   const byDay = new Map(
     daily.map((row) => [row.day, row.visitors]),
   );
@@ -234,5 +335,6 @@ export async function loadStats(
       n: row.n,
       flag: regionFlag(row.code),
     })),
+    places,
   };
 }

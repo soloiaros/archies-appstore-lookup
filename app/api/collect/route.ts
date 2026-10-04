@@ -6,10 +6,11 @@ import {
   applyCookies,
   cleanPath,
   referrerHost,
-  requestCountry,
   requestHost,
   visitIds,
 } from "@/lib/site/http";
+
+import { requestPlace } from "@/lib/site/place";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +40,15 @@ export async function POST(request: Request) {
 
   const visit = visitIds(request);
 
+  const place = await requestPlace(request);
+
   await recordView({
     path,
-    country: requestCountry(request),
+    country: place.country,
+    city: place.city,
+    region: place.region,
+    lat: place.lat,
+    lon: place.lon,
     referrerHost: referrerHost(
       body?.referrer,
       requestHost(request),
