@@ -36,8 +36,6 @@ import { OutputPanel } from "@/components/OutputPanel";
 
 import { OutputShell } from "@/components/OutputShell";
 
-import { LiveStats } from "@/components/LiveStats";
-
 import { ProvenanceMark } from "@/components/ProvenanceMark";
 
 import { SearchComposer } from "@/components/SearchComposer";
@@ -568,8 +566,6 @@ export function QueryScreen({
                   <p className="stage-sub">
                     All top-chart level apps, one search away with Jev x 10k.
                   </p>
-
-                  <LiveStats />
                 </div>
 
                 <SearchComposer
