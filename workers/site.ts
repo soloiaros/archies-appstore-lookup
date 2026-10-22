@@ -4,6 +4,8 @@ import { ensureSchema, fromD1, type D1Database } from "../lib/site/d1";
 
 import { Presence } from "../lib/site/presence-do";
 
+import type { IconEmbedNamespace } from "../lib/site/db";
+
 import { sweepSite } from "../lib/site/sweep";
 
 export { IconEmbed } from "./icon-embed";
@@ -22,6 +24,8 @@ type Bindings = {
   SITE_DB?: D1Database;
 
   CATALOG_DB?: D1Database;
+
+  ICON_EMBED?: IconEmbedNamespace;
 };
 
 const token = {};
@@ -62,6 +66,20 @@ export default {
     env: Bindings,
     ctx: { waitUntil(promise: Promise<unknown>): void },
   ) {
+    const iconEmbed = env.ICON_EMBED;
+
+    if (iconEmbed) {
+      ctx.waitUntil((async () => {
+        const response = await iconEmbed
+          .getByName("siglip")
+          .fetch("https://icon-embed/idle-check", { method: "POST" });
+
+        if (!response.ok) {
+          throw new Error(`Icon idle check failed: ${response.status}`);
+        }
+      })());
+    }
+
     if (!env.SITE_DB) {
       return;
     }

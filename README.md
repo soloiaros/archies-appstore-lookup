@@ -26,7 +26,7 @@ A query is classified before anything is retrieved.
 Discovery path:
 
 1. The server holds every app’s description vector, icon vector, colors, and any letters read off the icon in memory (or, on Cloudflare, in a warm Durable Object).
-2. The query is embedded. Closest apps by description (bge-small), by icon (SigLIP2), by name, by tags, and by words are merged into one shortlist of at most 120.
+2. The query is embedded. Closest apps by description (bge-small), by name, by tags, and by words are merged into one shortlist of at most 120. Visual queries also use the icon embeddings (SigLIP2). Repeated query embeddings are cached briefly in the Worker isolate.
 3. That shortlist is one Jev request (`jev-latest` via OpenRouter). Apps under 30% stay off the pile / list.
 4. If the best probability is under 65%, one extra request can add apps that share tags with the first hits.
 
@@ -148,7 +148,7 @@ These are product rules, not style preferences:
 
 ## Deploy notes
 
-A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP when icon search is enabled. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
+A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP on visual queries. The container stops after two minutes of inactivity, with the existing 15-minute scheduled job checking persisted activity as a fallback. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
 
 ## License
 

@@ -11,6 +11,11 @@ import type { SiteSql } from "@/lib/site/types";
 import type { Finalist } from "@/lib/types";
 
 import {
+  createEmbeddingCache,
+  queryNeedsIconEmbedding,
+} from "@/lib/catalog/embedding-policy";
+
+import {
   ICON_DIMS,
   ICON_MODEL,
   TEXT_DIMS,
@@ -32,6 +37,10 @@ const ASKING =
 const DEEPEN_CAP = 60;
 
 const PAGE = 500;
+
+const cachedTextEmbedding = createEmbeddingCache();
+
+const cachedIconEmbedding = createEmbeddingCache();
 
 let textVectors: Map<number, Float32Array> | null = null;
 
@@ -56,7 +65,9 @@ export async function vectorFinalists(
 
     const [asking, looking] = await Promise.all([
       embedQuery(query),
-      embedIconQuery(query).catch(() => null),
+      queryNeedsIconEmbedding(query)
+        ? embedIconQuery(query).catch(() => null)
+        : Promise.resolve(null),
       (async () => {
         if (!ranker) {
           gate.ranker = false;
@@ -223,6 +234,12 @@ function packMap(
 async function embedQuery(
   query: string,
 ): Promise<Float32Array | null> {
+  return cachedTextEmbedding(query, () => calculateTextEmbedding(query));
+}
+
+async function calculateTextEmbedding(
+  query: string,
+): Promise<Float32Array | null> {
   const ai = await workersAi();
 
   if (!ai) {
@@ -344,6 +361,12 @@ function siglipStub(namespace: IconEmbedNamespace): EdgeStub {
 }
 
 async function embedIconQuery(
+  query: string,
+): Promise<Float32Array | null> {
+  return cachedIconEmbedding(query, () => calculateIconEmbedding(query));
+}
+
+async function calculateIconEmbedding(
   query: string,
 ): Promise<Float32Array | null> {
   const namespace = await iconEmbed();
