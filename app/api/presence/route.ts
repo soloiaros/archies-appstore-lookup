@@ -4,20 +4,15 @@ import { tooMany, underLimit } from "@/lib/site/limit";
 
 import { hereNow } from "@/lib/site/presence";
 
-import { visitorTotal } from "@/lib/site/stats";
-
 export const dynamic = "force-dynamic";
 
 async function payload(request: Request, beat: boolean) {
   const visit = visitIds(request);
 
-  const [here, visitors] = await Promise.all([
-    hereNow(beat ? visit.ids.sid : null),
-    visitorTotal(),
-  ]);
+  const here = await hereNow(beat ? visit.ids.sid : null);
 
   return applyCookies(
-    Response.json({ here, visitors }),
+    Response.json({ here }),
     beat ? visit.cookies : [],
   );
 }
