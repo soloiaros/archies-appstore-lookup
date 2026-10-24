@@ -9,6 +9,10 @@ export function HereNow() {
     let stop = false;
 
     const tick = async () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
       const response = await fetch("/api/presence");
 
       if (!response.ok || stop) {
@@ -26,11 +30,14 @@ export function HereNow() {
 
     const id = window.setInterval(() => {
       void tick();
-    }, 20_000);
+    }, 60_000);
+
+    document.addEventListener("visibilitychange", tick);
 
     return () => {
       stop = true;
       window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
     };
   }, []);
 

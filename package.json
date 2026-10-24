@@ -22,6 +22,7 @@
     "test:staleness": "tsx scripts/test-staleness.ts",
     "test:revenue": "tsx scripts/test-revenue.ts",
     "test:embedding-policy": "tsx scripts/test-embedding-policy.ts",
+    "test:presence": "tsx scripts/test-presence.ts",
     "exercise:query": "tsx scripts/exercise-query.ts",
     "atlas": "node scripts/build-atlas.mjs",
     "cf:build": "opennextjs-cloudflare build"

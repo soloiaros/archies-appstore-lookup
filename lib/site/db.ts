@@ -8,7 +8,7 @@ type PresenceNamespace = {
   idFromName(name: string): unknown;
 
   get(id: unknown): {
-    fetch(input: string): Promise<Response>;
+    fetch(input: RequestInfo | URL): Promise<Response>;
   };
 };
 
