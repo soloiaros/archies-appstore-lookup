@@ -150,6 +150,8 @@ These are product rules, not style preferences:
 
 A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP on visual queries. The container stops after two minutes of inactivity, with the existing 15-minute scheduled job checking persisted activity as a fallback. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
 
+Catalog exports from `scripts/export-catalog-d1.mjs` now update `catalog_meta.rank_revision` after each import. The ranking Durable Object checks this one row before reusing its stored vectors. It creates the metadata row on first use for existing D1 catalogs; if catalog writes are restricted, it falls back to count checks. If catalog data is changed by another import path, update `rank_revision` as part of that import so the ranker reloads its vectors.
+
 ## License
 
 Source code is [MIT](LICENSE). Copyright (c) 2026 soloiaros.

@@ -91,10 +91,6 @@ export class CatalogRank {
       );
     }
 
-    if (path === "/warm") {
-      return Response.json({ ok: true });
-    }
-
     if (path !== "/nominate" || request.method !== "POST") {
       return new Response(null, { status: 404 });
     }
@@ -179,6 +175,10 @@ export class CatalogRank {
   }
 
   private matches(loaded: Memory, stamp: string): boolean {
+    if (stamp.startsWith("v:")) {
+      return loaded.text.ids.length > 0;
+    }
+
     const [text, icon, apps] = stamp.split(":").map(Number);
 
     return loaded.text.ids.length === text
@@ -191,6 +191,21 @@ export class CatalogRank {
 
     if (!db) {
       return null;
+    }
+
+    try {
+      const rows = await d1All<{ value: string }>(
+        db,
+        "select value from catalog_meta where key = 'rank_revision'",
+      );
+
+      const revision = rows[0]?.value;
+
+      if (typeof revision === "string" && /^[0-9a-f-]{36}$/i.test(revision)) {
+        return `v:${revision}`;
+      }
+    } catch {
+      // Existing catalog databases may not have catalog_meta yet.
     }
 
     const [text, apps, icon, tags] = await Promise.all([
@@ -233,7 +248,28 @@ export class CatalogRank {
       return null;
     }
 
-    return `${text}:${icon ?? 0}:${apps}:${tags ?? 0}`;
+    const legacyStamp = `${text}:${icon ?? 0}:${apps}:${tags ?? 0}`;
+
+    try {
+      await db.exec("create table if not exists catalog_meta (key text primary key, value text not null)");
+
+      await db.prepare(
+        "insert or ignore into catalog_meta (key, value) values ('rank_revision', ?)",
+      ).bind(crypto.randomUUID()).run();
+
+      const rows = await d1All<{ value: string }>(
+        db,
+        "select value from catalog_meta where key = 'rank_revision'",
+      );
+
+      if (typeof rows[0]?.value === "string") {
+        return `v:${rows[0].value}`;
+      }
+    } catch {
+      // Read-only catalog bindings can continue to use the old stamp.
+    }
+
+    return legacyStamp;
   }
 
   private async count(

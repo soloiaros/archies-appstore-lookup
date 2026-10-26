@@ -61,45 +61,18 @@ export async function vectorFinalists(
   try {
     const ranker = await catalogRank();
 
-    const gate = { ranker: Boolean(ranker) };
-
     const [asking, looking] = await Promise.all([
       embedQuery(query),
       queryNeedsIconEmbedding(query)
         ? embedIconQuery(query).catch(() => null)
         : Promise.resolve(null),
-      (async () => {
-        if (!ranker) {
-          gate.ranker = false;
-
-          await warmIsolate(sql);
-
-          return;
-        }
-
-        try {
-          const ready = await warmRanker(ranker);
-
-          if (!ready) {
-            gate.ranker = false;
-
-            await warmIsolate(sql);
-          }
-        } catch (error) {
-          console.error("catalog rank", error);
-
-          gate.ranker = false;
-
-          await warmIsolate(sql);
-        }
-      })(),
     ]);
 
     if (!asking) {
       return null;
     }
 
-    if (ranker && gate.ranker) {
+    if (ranker) {
       try {
         const ids = await nominateRemote(
           ranker,
@@ -120,24 +93,12 @@ export async function vectorFinalists(
       }
     }
 
+    await warmIsolate(sql);
+
     return rankFromCaches(sql, query, asking, looking);
   } catch {
     return null;
   }
-}
-
-async function warmRanker(ranker: EdgeStub): Promise<boolean> {
-  const response = await ranker.fetch("https://catalog/warm", {
-    method: "POST",
-  });
-
-  if (!response.ok) {
-    return false;
-  }
-
-  const body = await response.json() as { ok?: boolean };
-
-  return body.ok === true;
 }
 
 async function nominateRemote(
