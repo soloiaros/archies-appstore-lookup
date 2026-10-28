@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 
 import * as THREE from "three";
 
+import vendingAtlas from "../public/atlas/vending.json";
+
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -102,7 +104,7 @@ type StackAnim = {
 };
 
 type IconAtlas = {
-  texture: THREE.CanvasTexture;
+  texture: THREE.Texture;
   cols: number;
   rows: number;
   count: number;
@@ -271,7 +273,38 @@ function buildIconAtlas(images: HTMLImageElement[]): IconAtlas {
   };
 }
 
-async function loadIconAtlas(limit: number): Promise<IconAtlas> {
+async function loadStaticIconAtlas(): Promise<IconAtlas> {
+  const image = await loadImage(vendingAtlas.sheet);
+
+  if (
+    image.naturalWidth !== vendingAtlas.cols * ATLAS_CELL
+    || image.naturalHeight !== vendingAtlas.rows * ATLAS_CELL
+  ) {
+    throw new Error("vending atlas dimensions do not match its manifest");
+  }
+
+  const texture = new THREE.Texture(image);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.flipY = true;
+  texture.needsUpdate = true;
+  texture.userData.ownsTexture = true;
+
+  return {
+    texture,
+    cols: vendingAtlas.cols,
+    rows: vendingAtlas.rows,
+    count: vendingAtlas.count,
+    tileScale: new THREE.Vector2(1 / vendingAtlas.cols, 1 / vendingAtlas.rows),
+  };
+}
+
+async function loadDynamicIconAtlas(limit: number): Promise<IconAtlas> {
   const res = await fetch(`/api/vending-icons?limit=${limit}`);
 
   if (!res.ok) {
@@ -308,6 +341,15 @@ async function loadIconAtlas(limit: number): Promise<IconAtlas> {
   }
 
   return buildIconAtlas(images);
+}
+
+async function loadIconAtlas(): Promise<IconAtlas> {
+  try {
+    return await loadStaticIconAtlas();
+  } catch (error) {
+    console.warn("[vending] static atlas unavailable; loading icons individually", error);
+    return loadDynamicIconAtlas(ICON_POOL_LIMIT);
+  }
 }
 
 function disposeOwned(root: THREE.Object3D) {
@@ -1326,7 +1368,7 @@ export function VendingMachineScene() {
 
     void (async () => {
       try {
-        const atlas = await loadIconAtlas(ICON_POOL_LIMIT);
+        const atlas = await loadIconAtlas();
 
         if (disposed) {
           atlas.texture.dispose();
