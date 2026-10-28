@@ -25,7 +25,8 @@
     "test:presence": "tsx scripts/test-presence.ts",
     "exercise:query": "tsx scripts/exercise-query.ts",
     "atlas": "node scripts/build-atlas.mjs",
-    "cf:build": "opennextjs-cloudflare build"
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:package": "opennextjs-cloudflare build --skipNextBuild"
   },
   "dependencies": {
     "@cloudflare/containers": "^0.3.7",
