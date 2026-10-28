@@ -60,6 +60,10 @@ type VectorRow = {
   vector: Float32Array;
 };
 
+function isRankRevision(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f-]{36}$/i.test(value);
+}
+
 export class CatalogRank {
   private memory: Memory | null = null;
 
@@ -201,7 +205,7 @@ export class CatalogRank {
 
       const revision = rows[0]?.value;
 
-      if (typeof revision === "string" && /^[0-9a-f-]{36}$/i.test(revision)) {
+      if (isRankRevision(revision)) {
         return `v:${revision}`;
       }
     } catch {
@@ -262,7 +266,7 @@ export class CatalogRank {
         "select value from catalog_meta where key = 'rank_revision'",
       );
 
-      if (typeof rows[0]?.value === "string") {
+      if (isRankRevision(rows[0]?.value)) {
         return `v:${rows[0].value}`;
       }
     } catch {
