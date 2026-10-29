@@ -10,6 +10,7 @@ import {
   floatsFromBytes,
   nominateIds,
   packVectors,
+  prepareCatalogApps,
   type CatalogApp,
   type PackedVectors,
 } from "./rank";
@@ -338,7 +339,7 @@ export class CatalogRank {
       ICON_PAGE,
     );
 
-    const apps = await this.loadApps();
+    const apps = prepareCatalogApps(await this.loadApps());
 
     const expectedTags = Number(stamp.split(":")[3] ?? 0);
 
@@ -767,7 +768,7 @@ export class CatalogRank {
 
       const icons = this.readPacked("icon_vec", ICON_DIMS);
 
-      const apps = this.readApps();
+      const apps = prepareCatalogApps(this.readApps());
 
       if (text.ids.length === 0) {
         return null;
