@@ -41,7 +41,7 @@ export type CatalogApp = {
 
 type SearchFields = {
   name: string;
-  words: Set<string>;
+  words: string;
   letters: string;
 };
 
@@ -51,7 +51,7 @@ export function prepareCatalogApps(apps: CatalogApp[]): CatalogApp[] {
   for (const app of apps) {
     searchFields.set(app, {
       name: app.name.toLowerCase(),
-      words: new Set(tokenize(`${app.name} ${app.blurb}`)),
+      words: ` ${tokenize(`${app.name} ${app.blurb}`).join(" ")} `,
       letters: app.letters.toLowerCase(),
     });
   }
@@ -292,7 +292,7 @@ function lexicalHits(
       let hits = 0;
 
       for (const word of words) {
-        if (hay.has(word)) {
+        if (hay.includes(` ${word} `)) {
           hits += 1;
         }
       }
