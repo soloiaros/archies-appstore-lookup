@@ -20,7 +20,7 @@ A query is classified before anything is retrieved.
 | Shape | When | What you get |
 | --- | --- | --- |
 | Factual | A short name, or a question that starts like “what” or “rating” | One app’s stored fields, each with a provenance tier. No language model. |
-| Comparative | Words like “vs”, “compare”, “faster”, “growing” | A list sorted by stored momentum. Momentum stays unavailable until two daily rating snapshots exist. |
+| Comparative | Words like “vs”, “compare”, “faster”, “growing” | A list sorted by stored momentum. Momentum needs at least two rating snapshots; production refreshes them weekly. |
 | Discovery | Anything else (“minimalist habit tracker”, “green owl icon”) | Apps that Jev scores at 30% or above, with that percentage beside each one. |
 
 Discovery path:
@@ -74,6 +74,7 @@ Scripts are idempotent: run one twice with no new upstream data and you should n
 | `npm run scrape:seed` | Read country charts (overall + per category: free, paid, grossing), dedupe `trackId`, batch Lookup (≤200 ids). |
 | `npm run embed:pass` | Description embeddings, SigLIP2 icon embeddings, pixel color summary, Tesseract letters on the icon. Skips unchanged source hash + model id. |
 | `npm run poll:momentum` | Refresh metadata and append that day’s rating / chart rows. Also writes `revenue_estimates` from grossing ranks. |
+| `npm run sync:catalog` | Fetch current charts and publish bounded, idempotent app, rating, chart, and text-vector batches directly to production D1. Intended for the weekly GitHub workflow. |
 | `npm run estimate:revenue` | Backfill spend estimates without a full poll. |
 | `npm run tag:pass` | Tag apps against `data/tags/tags.json` (cost-bearing if wired to an LLM; start on a small subset). |
 | `npm run atlas` | Pack the search pile and a small static icon sheet for the home vending scene. |
@@ -102,9 +103,15 @@ Game subgenres (7001–7019) and some catalog / sticker genres are outside the d
 
 A 404 on re-fetch of a previously indexed app means delisted: flag the record, do not treat it as a hard failure.
 
-### Daily refresh
+### Production weekly refresh
 
-One job should run `npm run poll:momentum`. The repo ships [`.github/workflows/daily.yml`](.github/workflows/daily.yml) and [`schedule/crontab`](schedule/crontab). Momentum needs two daily rating snapshots before a velocity can be non-unavailable.
+The [weekly catalog workflow](.github/workflows/weekly-catalog.yml) runs at 03:37 UTC on Mondays and can be started manually. It reads the current country charts, looks up only apps appearing in those charts, generates new or changed BGE text vectors on the GitHub runner, and writes small batches to D1. Its per-feed coverage checks and post-import query make a failed or missing update visible. A scoped Cloudflare API token with D1 Read and D1 Write for this account must be stored as the repository Actions secret `CLOUDFLARE_API_TOKEN`; never commit it or use a local Wrangler OAuth token in CI. The workflow does not use Workers AI, containers, or a Worker request to import data.
+
+For the first run after replacing the old daily cache job, manually dispatch the workflow with `backfill_cache` enabled while the latest `catalog-sqlite-*` Actions cache still exists. That imports cached apps, embeds previously unindexed descriptions, and keeps one chart and rating snapshot per cached week before fetching current charts. This backfill can take longer than ordinary weekly runs. A plain manual dispatch performs only the current weekly sync. The D1 database remains the source of truth if the Actions cache expires.
+
+The job stops before one million rows written in a run or one gigabyte of catalog D1 storage. Production currently uses far less than the paid plan's included D1 allowance. It sends at most 25 rows or 80 KB per write, with a short pause between batches, so imports do not create a large D1 lock. The ranking Durable Object checks the revision in the background at most once per five minutes while serving requests; user requests continue against its current in-memory index during a refresh.
+
+`npm run poll:momentum` remains useful for local experiments. It updates only `data/catalog.sqlite` and is not a production updater; remove any installed local crontab entry once the D1 workflow is active. Weekly snapshots provide week-to-week momentum rather than daily momentum.
 
 ## Checks
 
@@ -150,7 +157,7 @@ These are product rules, not style preferences:
 
 A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP on visual queries. The container stops after two minutes of inactivity, with the existing 15-minute scheduled job checking persisted activity as a fallback. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
 
-Catalog exports from `scripts/export-catalog-d1.mjs` now update `catalog_meta.rank_revision` after each import. The ranking Durable Object checks this one row before reusing its stored vectors. It creates the metadata row on first use for existing D1 catalogs; if catalog writes are restricted, it falls back to count checks. If catalog data is changed by another import path, update `rank_revision` as part of that import so the ranker reloads its vectors.
+Catalog exports from `scripts/export-catalog-d1.mjs` and the weekly D1 sync update `catalog_meta.rank_revision` after each import. The ranking Durable Object checks this one row before reusing its stored vectors and refreshes a warm index in the background when it changes. If catalog data is changed by another import path, update `rank_revision` as part of that import so the ranker reloads its vectors.
 
 ## License
 
