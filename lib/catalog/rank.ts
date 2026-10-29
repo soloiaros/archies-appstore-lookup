@@ -39,6 +39,33 @@ export type CatalogApp = {
   tags: string[];
 };
 
+type SearchFields = {
+  name: string;
+  words: Set<string>;
+  letters: string;
+};
+
+const searchFields = new WeakMap<CatalogApp, SearchFields>();
+
+export function prepareCatalogApps(apps: CatalogApp[]): CatalogApp[] {
+  for (const app of apps) {
+    searchFields.set(app, {
+      name: app.name.toLowerCase(),
+      words: new Set(tokenize(`${app.name} ${app.blurb}`)),
+      letters: app.letters.toLowerCase(),
+    });
+  }
+
+  return apps;
+}
+
+function fieldsOf(app: CatalogApp): SearchFields {
+  const cached = searchFields.get(app);
+  if (cached) return cached;
+  prepareCatalogApps([app]);
+  return searchFields.get(app)!;
+}
+
 export type PackedVectors = {
   ids: Int32Array;
 
@@ -242,8 +269,7 @@ function nameHits(
 
   return apps
     .filter((app) => {
-      const name = app.name.toLowerCase();
-
+      const name = fieldsOf(app).name;
       return words.some((word) => name.includes(word));
     })
     .map((app) => app.trackId);
@@ -261,12 +287,12 @@ function lexicalHits(
 
   return apps
     .map((app) => {
-      const hay = tokenize(`${app.name} ${app.blurb}`);
+      const hay = fieldsOf(app).words;
 
       let hits = 0;
 
       for (const word of words) {
-        if (hay.includes(word)) {
+        if (hay.has(word)) {
           hits += 1;
         }
       }
@@ -294,7 +320,7 @@ function letterHits(
 
   return apps
     .filter((app) => {
-      const letters = app.letters.toLowerCase();
+      const letters = fieldsOf(app).letters;
 
       return (
         letters.length > 0
