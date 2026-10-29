@@ -83,6 +83,14 @@ const feeds = [
 assert.doesNotThrow(() => assertFeedCoverage(feeds, 1000));
 assert.throws(() => assertFeedCoverage(feeds, 999));
 assert.throws(() => assertFeedCoverage(feeds.map((feed) => ({ ...feed, error: "HTTP 500" })), 1000));
+assert.throws(() => assertFeedCoverage(feeds.map((feed) =>
+  feed.chart === "top-grossing" ? { ...feed, genreId: 6001 } : feed), 1000));
+assert.throws(() => assertFeedCoverage([
+  ...feeds,
+  ...Array.from({ length: 2 }, () => ({
+    chart: "top-free", genreId: 6001, hits: 0, error: "HTTP 500",
+  })),
+], 1000));
 
 db.close();
 console.log("weekly catalog D1 checks passed");
