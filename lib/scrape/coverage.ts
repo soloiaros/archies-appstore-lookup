@@ -17,3 +17,18 @@ export function assertFeedCoverage(
     })}`);
   }
 }
+
+export function assertMarketCoverage(
+  feeds: Array<{ chart: string; genreId: number | null; hits: number; error: string | null }>,
+  uniqueIds: number,
+): void {
+  const healthy = ["top-free", "top-paid", "top-grossing"].every((chart) =>
+    feeds.some((feed) => feed.chart === chart && feed.genreId === null
+      && feed.error === null && feed.hits >= (chart === "top-grossing" ? 20 : 50)));
+
+  if (!healthy || uniqueIds < 150) {
+    throw new Error(`Market chart coverage unsafe: ${JSON.stringify({
+      feeds: feeds.length, uniqueIds, healthy,
+    })}`);
+  }
+}

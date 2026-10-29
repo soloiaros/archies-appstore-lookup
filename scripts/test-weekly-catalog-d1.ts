@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import { jsonChunks } from "../lib/catalog/d1-sync";
 import { CATALOG_INDEXES, insertJsonSql } from "../lib/catalog/d1-sync-sql";
-import { assertFeedCoverage } from "../lib/scrape/coverage";
+import { assertFeedCoverage, assertMarketCoverage } from "../lib/scrape/coverage";
 
 const db = new DatabaseSync(":memory:");
 db.exec(readFileSync("models/schema.sql", "utf8"));
@@ -72,6 +72,25 @@ const writeVector = db.prepare(insertJsonSql("text_embeddings"));
 assert.equal(changes(writeVector.run(JSON.stringify([vector]))), 1);
 assert.equal(changes(writeVector.run(JSON.stringify([vector]))), 0);
 
+const marketApp = {
+  country: "jp", track_id: 123,
+  first_seen_on: "2026-10-01", last_seen_on: "2026-10-29",
+};
+const writeMarketApp = db.prepare(insertJsonSql("market_apps"));
+assert.equal(changes(writeMarketApp.run(JSON.stringify([marketApp]))), 1);
+assert.equal(changes(writeMarketApp.run(JSON.stringify([{ ...marketApp, first_seen_on: "2026-10-30", last_seen_on: "2026-10-30" }]))), 1);
+assert.equal((db.prepare("select first_seen_on from market_apps").get() as { first_seen_on: string }).first_seen_on, "2026-10-01");
+
+const marketMetadata = {
+  country: "jp", track_id: 123, name: "ノート", description: "メモ",
+  icon_url: app.icon_url, store_url: app.store_url,
+  formatted_price: "無料", currency: "JPY", rating_average: 4.5,
+  rating_count: 50, metadata_fetched_at: "2026-10-29T00:00:00Z",
+};
+const writeMarketMetadata = db.prepare(insertJsonSql("market_metadata"));
+assert.equal(changes(writeMarketMetadata.run(JSON.stringify([marketMetadata]))), 1);
+assert.equal(changes(writeMarketMetadata.run(JSON.stringify([marketMetadata]))), 0);
+
 assert.deepEqual(jsonChunks([{ x: 1 }, { x: 2 }, { x: 3 }], 2).map((chunk) => chunk.length), [2, 1]);
 assert.throws(() => jsonChunks([{ x: "a".repeat(80_001) }]));
 
@@ -91,6 +110,10 @@ assert.throws(() => assertFeedCoverage([
     chart: "top-free", genreId: 6001, hits: 0, error: "HTTP 500",
   })),
 ], 1000));
+assert.doesNotThrow(() => assertMarketCoverage(feeds, 200));
+assert.throws(() => assertMarketCoverage(feeds, 149));
+assert.throws(() => assertMarketCoverage(feeds.map((feed) =>
+  feed.chart === "top-paid" ? { ...feed, error: "HTTP 500" } : feed), 200));
 
 db.close();
 console.log("weekly catalog D1 checks passed");
