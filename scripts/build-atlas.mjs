@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
 
@@ -14,6 +15,9 @@ const COLS = 48;
 const COUNT = 1200;
 const SEED = 0x5eed1c04;
 const CONCURRENCY = 24;
+const VENDING_COUNT = 50;
+const VENDING_CELL = 128;
+const VENDING_COLS = 8;
 const pitch = CELL + GUTTER;
 
 const mulberry32 = (a) => () => {
@@ -40,6 +44,10 @@ const rows = db
   `,
   )
   .all();
+
+const indexed = db.prepare(
+  "select count(*) as n from apps where delisted = 0",
+).get().n;
 
 db.close();
 
@@ -184,12 +192,8 @@ const out = path.join(ROOT, "public", "atlas");
 fs.mkdirSync(out, { recursive: true });
 
 await sheet
-  .webp({ lossless: true, effort: 6 })
+  .webp({ quality: 78, effort: 6 })
   .toFile(path.join(out, "pile.webp"));
-
-const indexed = db.prepare(
-  "select count(*) as n from apps where delisted = 0",
-).get().n;
 
 fs.writeFileSync(
   path.join(out, "pile.json"),
@@ -211,3 +215,50 @@ const bytes = fs.statSync(
 console.log(
   `public/atlas/pile.webp ${(bytes / 1048576).toFixed(2)} MB (${Math.round(bytes / chosen.length)} B/icon) in ${((Date.now() - started) / 1000).toFixed(1)}s${failed ? `, ${failed} failed` : ""}`,
 );
+
+const vending = tiles.filter(Boolean).slice(0, VENDING_COUNT);
+
+if (vending.length === 0) {
+  throw new Error("No icons available for the vending atlas");
+}
+
+const vendingRows = Math.ceil(vending.length / VENDING_COLS);
+const vendingTiles = await Promise.all(vending.map(async (tile, at) => ({
+  input: await sharp(tile.input)
+    .resize(VENDING_CELL, VENDING_CELL)
+    .png()
+    .toBuffer(),
+  left: (at % VENDING_COLS) * VENDING_CELL,
+  top: Math.floor(at / VENDING_COLS) * VENDING_CELL,
+})));
+
+const vendingImage = await sharp({
+  create: {
+    width: VENDING_COLS * VENDING_CELL,
+    height: vendingRows * VENDING_CELL,
+    channels: 4,
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  },
+})
+  .composite(vendingTiles)
+  .webp({ quality: 78, effort: 6 })
+  .toBuffer();
+
+fs.writeFileSync(path.join(out, "vending.webp"), vendingImage);
+
+const revision = createHash("sha256")
+  .update(vendingImage)
+  .digest("hex")
+  .slice(0, 12);
+
+fs.writeFileSync(
+  path.join(out, "vending.json"),
+  JSON.stringify({
+    sheet: `/atlas/vending.webp?v=${revision}`,
+    count: vending.length,
+    cols: VENDING_COLS,
+    rows: vendingRows,
+  }),
+);
+
+console.log(`public/atlas/vending.webp ${(vendingImage.length / 1024).toFixed(0)} KB (${vending.length} icons)`);

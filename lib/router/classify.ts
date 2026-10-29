@@ -1,5 +1,7 @@
 import type { QueryShape } from "@/lib/types";
 
+import { queryNeedsIconEmbedding } from "@/lib/catalog/embedding-policy";
+
 const COMPARATIVE =
   /\b(vs\.?|versus|compare[sd]?|faster|slower|growing|momentum|outrank)\b/i;
 
@@ -20,6 +22,14 @@ export function classify(
     return "comparative";
   }
 
+  if (FACTUAL_START.test(text)) {
+    return "factual";
+  }
+
+  if (queryNeedsIconEmbedding(text)) {
+    return "discovery";
+  }
+
   const words = text
     .split(/\s+/)
     .filter(Boolean);
@@ -29,10 +39,7 @@ export function classify(
     && words.length <= 3
     && !DISCOVERY_CUE.test(text);
 
-  if (
-    FACTUAL_START.test(text)
-    || named
-  ) {
+  if (named) {
     return "factual";
   }
 

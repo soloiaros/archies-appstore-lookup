@@ -44,7 +44,7 @@ export function PageBeacon() {
 
     beat();
 
-    const id = window.setInterval(beat, 20_000);
+    const id = window.setInterval(beat, 60_000);
 
     document.addEventListener("visibilitychange", beat);
 

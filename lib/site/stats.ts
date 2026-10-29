@@ -52,16 +52,6 @@ function windowStart(days: number, now: number) {
   return now - days * DAY;
 }
 
-export async function visitorTotal(): Promise<number> {
-  const sql = await siteDb();
-
-  const row = await sql.get<{ visitors: number }>(
-    "select count(distinct vid) as visitors from pageviews",
-  );
-
-  return row?.visitors ?? 0;
-}
-
 export async function recordView(input: {
   path: string;
 

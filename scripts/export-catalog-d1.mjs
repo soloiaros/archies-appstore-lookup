@@ -1,5 +1,7 @@
 import { writeFileSync } from "node:fs";
 
+import { randomUUID } from "node:crypto";
+
 import { DatabaseSync } from "node:sqlite";
 
 const db = new DatabaseSync("data/catalog.sqlite", {
@@ -44,6 +46,14 @@ function insert(table, columns, rows, batchSize = 20) {
   return lines;
 }
 
+function withRankRevision(sql) {
+  return [
+    sql,
+    "create table if not exists catalog_meta (key text primary key, value text not null);",
+    `insert or replace into catalog_meta (key, value) values ('rank_revision', '${randomUUID()}');`,
+  ].join("\n");
+}
+
 if (process.argv.includes("icons")) {
   const icons = db.prepare(`
     select track_id, tier, method, model, vector
@@ -66,9 +76,10 @@ if (process.argv.includes("icons")) {
     { name: "vector", type: "text" },
   ], encoded, 10).join("\n");
 
-  writeFileSync("/tmp/catalog-icons.sql", sql);
+  const output = withRankRevision(sql);
+  writeFileSync("/tmp/catalog-icons.sql", output);
 
-  console.log("icons", encoded.length, "bytes", sql.length);
+  console.log("icons", encoded.length, "bytes", output.length);
 
   process.exit(0);
 }
@@ -156,7 +167,8 @@ if (vectorsOnly) {
     ], revenue).slice(1),
   ].join("\n");
 
-  writeFileSync("/tmp/catalog-vectors.sql", sql);
+  const output = withRankRevision(sql);
+  writeFileSync("/tmp/catalog-vectors.sql", output);
 
   console.log(
     "vectors",
@@ -168,7 +180,7 @@ if (vectorsOnly) {
     "revenue",
     revenue.length,
     "bytes",
-    sql.length,
+    output.length,
   );
 
   process.exit(0);
@@ -227,6 +239,7 @@ const sql = [
   "create index if not exists chart_snapshots_track on chart_snapshots (track_id, captured_at);",
 ].join("\n");
 
-writeFileSync("/tmp/catalog-d1.sql", sql);
+const output = withRankRevision(sql);
+writeFileSync("/tmp/catalog-d1.sql", output);
 
-console.log("apps", apps.length, "ratings", ratings.length, "charts", charts.length, "bytes", sql.length);
+console.log("apps", apps.length, "ratings", ratings.length, "charts", charts.length, "bytes", output.length);

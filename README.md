@@ -26,7 +26,7 @@ A query is classified before anything is retrieved.
 Discovery path:
 
 1. The server holds every app’s description vector, icon vector, colors, and any letters read off the icon in memory (or, on Cloudflare, in a warm Durable Object).
-2. The query is embedded. Closest apps by description (bge-small), by icon (SigLIP2), by name, by tags, and by words are merged into one shortlist of at most 120.
+2. The query is embedded. Closest apps by description (bge-small), by name, by tags, and by words are merged into one shortlist of at most 120. Visual queries also use the icon embeddings (SigLIP2). Repeated query embeddings are cached briefly in the Worker isolate.
 3. That shortlist is one Jev request (`jev-latest` via OpenRouter). Apps under 30% stay off the pile / list.
 4. If the best probability is under 65%, one extra request can add apps that share tags with the first hits.
 
@@ -76,7 +76,7 @@ Scripts are idempotent: run one twice with no new upstream data and you should n
 | `npm run poll:momentum` | Refresh metadata and append that day’s rating / chart rows. Also writes `revenue_estimates` from grossing ranks. |
 | `npm run estimate:revenue` | Backfill spend estimates without a full poll. |
 | `npm run tag:pass` | Tag apps against `data/tags/tags.json` (cost-bearing if wired to an LLM; start on a small subset). |
-| `npm run atlas` | Pack a sheet of icons for the desktop physics pile. |
+| `npm run atlas` | Pack the search pile and a small static icon sheet for the home vending scene. |
 
 ### Chart feeds
 
@@ -98,7 +98,7 @@ Game subgenres (7001–7019) and some catalog / sticker genres are outside the d
 2. **Known track ids** — upsert extra apps through the same Lookup client used by the seed script (batch ≤200, retry/backoff in the client). Re-run embed for new or changed icons / descriptions.
 3. **On-demand miss** — a factual name that is not in the index can be Lookup’d, inserted, and answered one app at a time (same refresh path as staleness).
 4. **Tags** — grow `data/tags/tags.json` and run `tag:pass` on a subset before a full pass. Tags feed the discovery shortlist and deepen step.
-5. **Atlas** — after icon rows change, run `npm run atlas` so the desktop pile sheet matches the catalog.
+5. **Atlas** — after icon rows change, run `npm run atlas` so the search pile and home vending sheets match the catalog.
 
 A 404 on re-fetch of a previously indexed app means delisted: flag the record, do not treat it as a hard failure.
 
@@ -148,7 +148,9 @@ These are product rules, not style preferences:
 
 ## Deploy notes
 
-A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP when icon search is enabled. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
+A Cloudflare Worker build exists (`npm run cf:build` + Wrangler). That path uses D1 for the catalog, Workers AI for BGE query embed, and a container for SigLIP on visual queries. The container stops after two minutes of inactivity, with the existing 15-minute scheduled job checking persisted activity as a fallback. Local `npm run dev` against `data/catalog.sqlite` is the simplest way to reproduce the product. Treat cloud bindings and secrets as your own ops concern; do not commit them.
+
+Catalog exports from `scripts/export-catalog-d1.mjs` now update `catalog_meta.rank_revision` after each import. The ranking Durable Object checks this one row before reusing its stored vectors. It creates the metadata row on first use for existing D1 catalogs; if catalog writes are restricted, it falls back to count checks. If catalog data is changed by another import path, update `rank_revision` as part of that import so the ranker reloads its vectors.
 
 ## License
 

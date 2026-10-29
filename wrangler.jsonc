@@ -6,6 +6,10 @@
   "preview_urls": false,
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
+  // Cloudflare Builds runs `npm run build` first; package that standalone output for Wrangler.
+  "build": {
+    "command": "npm run cf:package"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -45,6 +49,30 @@
       "database_id": "44635e0b-2a36-4bbc-889b-1b2a5028895f"
     }
   ],
+  // PR deployments use separate D1 databases and skip the costly icon container.
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "SITE_DB",
+        "database_name": "site-preview",
+        "database_id": "3e445ec6-c19a-4b95-9a11-b208ea51325e"
+      },
+      {
+        "binding": "CATALOG_DB",
+        "database_name": "catalog-preview",
+        "database_id": "5528da61-8839-40b4-934c-39845df3cbef"
+      }
+    ],
+    "ai": {
+      "binding": "AI"
+    },
+    "durable_objects": {
+      "bindings": [
+        { "name": "PRESENCE", "class_name": "Presence" },
+        { "name": "CATALOG_RANK", "class_name": "CatalogRank" }
+      ]
+    }
+  },
   "durable_objects": {
     "bindings": [
       {
