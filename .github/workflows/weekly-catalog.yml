@@ -1,0 +1,65 @@
+name: Weekly catalog sync
+
+on:
+  schedule:
+    # 03:37 UTC Monday, away from the top-of-hour Actions queue.
+    - cron: "37 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      backfill_cache:
+        description: "Import the latest daily SQLite cache before the weekly refresh"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-catalog-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Restore the last daily catalog for one-time backfill
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_cache }}
+        uses: actions/cache/restore@v4
+        with:
+          path: data/catalog.sqlite
+          key: catalog-sqlite-${{ github.run_id }}
+          restore-keys: |
+            catalog-sqlite-
+
+      - name: Check D1 credential
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: test -n "$CLOUDFLARE_API_TOKEN"
+
+      - name: Backfill cached catalog and fetch current charts
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_cache }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: fd75e45889c3e4480b8ccee44f51156a
+          CATALOG_D1_ID: 44635e0b-2a36-4bbc-889b-1b2a5028895f
+        run: npm run sync:catalog -- --backfill-cache
+
+      - name: Fetch current charts and update D1
+        if: ${{ github.event_name == 'schedule' || !inputs.backfill_cache }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: fd75e45889c3e4480b8ccee44f51156a
+          CATALOG_D1_ID: 44635e0b-2a36-4bbc-889b-1b2a5028895f
+        run: npm run sync:catalog

@@ -22,6 +22,8 @@ const ICON_PAGE = 120;
 
 const APP_PAGE = 500;
 
+const REVISION_CHECK_MS = 5 * 60 * 1000;
+
 type SqlRow = Record<string, unknown>;
 
 type SqlCursor = Iterable<SqlRow> & {
@@ -40,6 +42,8 @@ type RankState = {
   };
 
   blockConcurrencyWhile(work: () => Promise<void>): Promise<void>;
+
+  waitUntil(work: Promise<unknown>): void;
 };
 
 type RankEnv = {
@@ -66,6 +70,10 @@ function isRankRevision(value: unknown): value is string {
 
 export class CatalogRank {
   private memory: Memory | null = null;
+
+  private nextRevisionCheck = Date.now() + REVISION_CHECK_MS;
+
+  private refreshing: Promise<void> | null = null;
 
   constructor(
     private readonly state: RankState,
@@ -94,6 +102,8 @@ export class CatalogRank {
         { status: 500 },
       );
     }
+
+    this.refreshInBackground();
 
     if (path !== "/nominate" || request.method !== "POST") {
       return new Response(null, { status: 404 });
@@ -140,6 +150,29 @@ export class CatalogRank {
       ok: true,
       ids,
     });
+  }
+
+  private refreshInBackground(): void {
+    if (this.refreshing || Date.now() < this.nextRevisionCheck) {
+      return;
+    }
+
+    this.nextRevisionCheck = Date.now() + REVISION_CHECK_MS;
+
+    const refresh = (async () => {
+      const stamp = await this.liveStamp();
+
+      if (stamp && stamp !== this.savedStamp()) {
+        this.memory = await this.fill(stamp);
+      }
+    })().catch((error: unknown) => {
+      console.error("catalog rank refresh", error);
+    }).finally(() => {
+      this.refreshing = null;
+    });
+
+    this.refreshing = refresh;
+    this.state.waitUntil(refresh);
   }
 
   private async ensure(): Promise<void> {

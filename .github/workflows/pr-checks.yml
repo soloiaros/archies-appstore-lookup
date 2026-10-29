@@ -31,4 +31,6 @@ jobs:
 
       - run: npm run test:presence
 
+      - run: npm run test:weekly-catalog
+
       - run: npm run cf:build
