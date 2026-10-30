@@ -25,6 +25,7 @@
     "test:embedding-policy": "tsx scripts/test-embedding-policy.ts",
     "test:presence": "tsx scripts/test-presence.ts",
     "test:weekly-catalog": "tsx scripts/test-weekly-catalog-d1.ts",
+    "test:markets": "tsx scripts/test-markets.ts",
     "exercise:query": "tsx scripts/exercise-query.ts",
     "atlas": "node scripts/build-atlas.mjs",
     "cf:build": "opennextjs-cloudflare build",

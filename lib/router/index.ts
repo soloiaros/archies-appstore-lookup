@@ -19,11 +19,13 @@ import { answerFactual } from "@/lib/router/factual";
 import { classify } from "@/lib/router/classify";
 
 import type { Finalist, QueryAnswer } from "@/lib/types";
+import { DEFAULT_MARKET, type MarketCode } from "@/lib/markets";
 
 loadLocalEnv();
 
 export async function answer(
   query: string,
+  market: MarketCode = DEFAULT_MARKET,
 ): Promise<QueryAnswer> {
   const shape = classify(query);
 
@@ -33,8 +35,12 @@ export async function answer(
     throw new Error("The app catalog is not available on this server.");
   }
 
+  if (!remote && market !== DEFAULT_MARKET) {
+    throw new Error("This market is not indexed in the local catalog.");
+  }
+
   const catalog = remote
-    ? cloudCatalog(remote)
+    ? cloudCatalog(remote, market)
     : sqliteCatalog();
 
   try {
@@ -42,6 +48,7 @@ export async function answer(
       return await answerFactual(
         query,
         catalog,
+        market,
       );
     }
 
@@ -79,6 +86,7 @@ export async function answer(
             remote,
             found.map((finalist) => finalist.trackId),
             tagHints(found, scores),
+            market,
           );
 
           if (extra.length > 0) {

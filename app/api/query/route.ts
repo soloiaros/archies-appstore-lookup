@@ -8,9 +8,11 @@ import {
 } from "@/lib/site/quota";
 
 import { answer } from "@/lib/router";
+import { DEFAULT_MARKET, parseMarket } from "@/lib/markets";
 
 type QueryBody = {
   query?: unknown;
+  market?: unknown;
 };
 
 export async function POST(
@@ -24,6 +26,11 @@ export async function POST(
     typeof body?.query === "string"
       ? body.query.trim().slice(0, 300)
       : "";
+
+  const market = parseMarket(body?.market ?? DEFAULT_MARKET);
+  if (!market) {
+    return Response.json({ error: "Choose a supported App Store market." }, { status: 400 });
+  }
 
   if (query.length < 2) {
     return Response.json(
@@ -56,7 +63,7 @@ export async function POST(
   }
 
   try {
-    const result = await answer(query);
+    const result = await answer(query, market);
 
     return applyCookies(
       Response.json({

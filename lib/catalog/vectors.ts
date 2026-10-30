@@ -7,6 +7,7 @@ import {
 } from "@/lib/site/db";
 
 import type { SiteSql } from "@/lib/site/types";
+import type { MarketCode } from "@/lib/markets";
 
 import type { Finalist } from "@/lib/types";
 
@@ -25,6 +26,7 @@ import {
   encodeVector,
   nominateIds,
   packVectors,
+  prepareCatalogApps,
   type CatalogApp,
   type PackedVectors,
 } from "@/lib/catalog/rank";
@@ -57,6 +59,7 @@ let catalogLoad: Promise<CatalogApp[]> | null = null;
 export async function vectorFinalists(
   sql: SiteSql,
   query: string,
+  market: MarketCode,
 ): Promise<Finalist[] | null> {
   try {
     const ranker = await catalogRank();
@@ -79,6 +82,7 @@ export async function vectorFinalists(
           query,
           asking,
           looking,
+          market,
         );
 
         if (ids) {
@@ -86,7 +90,7 @@ export async function vectorFinalists(
             return [];
           }
 
-          return hydrate(sql, ids);
+          return hydrate(sql, ids, market);
         }
       } catch (error) {
         console.error("catalog rank", error);
@@ -95,7 +99,7 @@ export async function vectorFinalists(
 
     await warmIsolate(sql);
 
-    return rankFromCaches(sql, query, asking, looking);
+    return rankFromCaches(sql, query, asking, looking, market);
   } catch {
     return null;
   }
@@ -106,6 +110,7 @@ async function nominateRemote(
   query: string,
   asking: Float32Array,
   looking: Float32Array | null,
+  market: MarketCode,
 ): Promise<number[] | null> {
   const response = await ranker.fetch("https://catalog/nominate", {
     method: "POST",
@@ -116,6 +121,7 @@ async function nominateRemote(
       query,
       text: encodeVector(asking),
       icon: looking ? encodeVector(looking) : null,
+      market,
     }),
   });
 
@@ -149,6 +155,7 @@ async function rankFromCaches(
   query: string,
   asking: Float32Array,
   looking: Float32Array | null,
+  market: MarketCode,
 ): Promise<Finalist[] | null> {
   const vectors = await loadTextVectors(sql);
 
@@ -161,22 +168,45 @@ async function rankFromCaches(
     loadCatalog(sql),
   ]);
 
+  const allowed = await loadMarketIds(sql, market);
+  let scopedApps = apps;
+  if (market !== "us") {
+    const rows = await sql.all<{ trackId: number; name: string; blurb: string }>(
+      "select track_id as trackId, name, substr(description, 1, 800) as blurb from market_metadata where country = ?",
+      [market],
+    );
+    const byId = new Map(apps.map((app) => [app.trackId, app]));
+    scopedApps = prepareCatalogApps(rows.flatMap((row) => {
+      const shared = byId.get(Number(row.trackId));
+      return shared ? [{ ...shared, name: String(row.name), blurb: String(row.blurb) }] : [];
+    }));
+  }
+
   const ids = nominateIds(
     query,
-    apps,
+    scopedApps,
     asking,
     packMap(vectors, TEXT_DIMS),
     looking,
     icons.size > 0
       ? packMap(icons, ICON_DIMS)
       : emptyPacked(ICON_DIMS),
+    allowed,
   );
 
   if (ids.length === 0) {
     return [];
   }
 
-  return hydrate(sql, ids);
+  return hydrate(sql, ids, market);
+}
+
+async function loadMarketIds(sql: SiteSql, market: MarketCode): Promise<Set<number>> {
+  const rows = await sql.all<{ trackId: number }>(
+    "select m.track_id as trackId from market_apps m join apps a on a.track_id = m.track_id where m.country = ? and (m.country <> 'us' or a.delisted = 0)",
+    [market],
+  );
+  return new Set(rows.map((row) => Number(row.trackId)));
 }
 
 function packMap(
@@ -487,7 +517,7 @@ async function readCatalog(
         name,
         substr(description, 1, 800) as blurb
       from apps
-      where delisted = 0 and track_id > ?
+      where track_id > ?
       order by track_id
       limit ${PAGE}
       `,
@@ -590,6 +620,7 @@ export async function deepenCandidates(
   sql: SiteSql,
   excluded: number[],
   tagIds: string[],
+  market: MarketCode,
 ): Promise<Finalist[]> {
   if (tagIds.length === 0) {
     return [];
@@ -601,12 +632,13 @@ export async function deepenCandidates(
 
   const rows = await sql.all<{ trackId: number }>(
     `
-    select distinct track_id as trackId
-    from app_tags
-    where tag_id in (${marks})
-    order by track_id
+    select distinct t.track_id as trackId
+    from app_tags t
+    join market_apps m on m.track_id = t.track_id
+    where m.country = ? and t.tag_id in (${marks})
+    order by t.track_id
     `,
-    tagIds,
+    [market, ...tagIds],
   );
 
   const ids = rows
@@ -618,7 +650,7 @@ export async function deepenCandidates(
     return [];
   }
 
-  return hydrate(sql, ids);
+  return hydrate(sql, ids, market);
 }
 
 function l2Normalize(vector: Float32Array): Float32Array {
@@ -658,6 +690,7 @@ function chunks<T>(items: T[]): T[][] {
 async function hydrate(
   sql: SiteSql,
   ids: number[],
+  market: MarketCode,
 ): Promise<Finalist[]> {
   const apps: Array<{
     trackId: number;
@@ -677,14 +710,16 @@ async function hydrate(
     }>(
       `
       select
-        track_id as trackId,
-        name,
-        description,
-        icon_url as iconUrl
-      from apps
-      where track_id in (${marks})
+        a.track_id as trackId,
+        coalesce(m.name, a.name) as name,
+        coalesce(m.description, a.description) as description,
+        coalesce(m.icon_url, a.icon_url) as iconUrl
+      from apps a
+      join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+      left join market_metadata m on m.country = ? and m.track_id = a.track_id
+      where a.track_id in (${marks})
       `,
-      slice,
+      [market, market, ...slice],
     );
 
     apps.push(...rows);

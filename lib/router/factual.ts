@@ -29,19 +29,22 @@ import type { FactualAnswer } from "@/lib/types";
 import type { AppMetadata } from "@/models/app";
 
 import type { Reading } from "@/models/provenance";
+import type { MarketCode } from "@/lib/markets";
 
 import type { RevenueBand } from "@/models/series";
 
 export async function answerFactual(
   query: string,
   catalog: Catalog,
+  market: MarketCode = "us",
 ): Promise<FactualAnswer> {
   let app = await catalog.findByName(query);
 
-  if (app && isStale(app.metadataFetchedAt, METADATA_MAX_AGE_MS)) {
+  if (market === "us" && app && isStale(app.metadataFetchedAt, METADATA_MAX_AGE_MS)) {
     try {
       const refreshed = await refreshOneApp(
         app.trackId,
+        market,
       );
 
       if (refreshed) {
@@ -52,9 +55,9 @@ export async function answerFactual(
     }
   }
 
-  if (!app) {
+  if (!app && market === "us") {
     try {
-      app = await lookupByName(query);
+      app = await lookupByName(query, market);
     } catch {
       app = null;
     }
@@ -97,7 +100,7 @@ export async function answerFactual(
         ? "verified"
         : "unavailable",
       momentumFromCharts(charts),
-      loadRevenue(app.trackId),
+      market === "us" ? loadRevenue(app.trackId) : unavailable(),
     ),
   };
 }
