@@ -2,10 +2,13 @@
 
 import {
   useCallback,
+  useEffect,
+  useRef,
   useState,
 } from "react";
 
 import type { QueryAnswer } from "@/lib/types";
+import { DEFAULT_MARKET, type MarketCode } from "@/lib/markets";
 
 export type QueryState =
   | {
@@ -15,16 +18,19 @@ export type QueryState =
       phase: "loading";
 
       query: string;
+      market: MarketCode;
     }
   | {
       phase: "done";
 
       answer: QueryAnswer;
+      market: MarketCode;
     }
   | {
       phase: "error";
 
       query: string;
+      market: MarketCode;
 
       message: string;
     };
@@ -33,15 +39,27 @@ export function useQuery() {
   const [state, setState] = useState<QueryState>({
     phase: "idle",
   });
+  const active = useRef<AbortController | null>(null);
+
+  useEffect(() => () => active.current?.abort(), []);
+
+  const reset = useCallback(() => {
+    active.current?.abort();
+    setState({ phase: "idle" });
+  }, []);
 
   const run = useCallback(
-    async (raw: string) => {
+    async (raw: string, market: MarketCode = DEFAULT_MARKET) => {
+      active.current?.abort();
+      const controller = new AbortController();
+      active.current = controller;
       const query = raw.trim();
 
       if (query.length < 2) {
         setState({
           phase: "error",
           query,
+          market,
           message: "Type at least 2 characters.",
         });
 
@@ -51,6 +69,7 @@ export function useQuery() {
       setState({
         phase: "loading",
         query,
+        market,
       });
 
       try {
@@ -63,11 +82,14 @@ export function useQuery() {
             },
             body: JSON.stringify({
               query,
+              market,
             }),
+            signal: controller.signal,
           },
         );
 
         const data: unknown = await response.json();
+        if (controller.signal.aborted) return;
 
         if (!response.ok) {
           const message =
@@ -78,6 +100,7 @@ export function useQuery() {
           setState({
             phase: "error",
             query,
+            market,
             message,
           });
 
@@ -88,6 +111,7 @@ export function useQuery() {
           setState({
             phase: "error",
             query,
+            market,
             message: "Query failed.",
           });
 
@@ -97,13 +121,16 @@ export function useQuery() {
         setState({
           phase: "done",
           answer: data,
+          market,
         });
 
         window.dispatchEvent(new Event("10k-quota"));
       } catch {
+        if (controller.signal.aborted) return;
         setState({
           phase: "error",
           query,
+          market,
           message: "Query failed.",
         });
       }
@@ -114,6 +141,7 @@ export function useQuery() {
   return {
     state,
     run,
+    reset,
   };
 }
 

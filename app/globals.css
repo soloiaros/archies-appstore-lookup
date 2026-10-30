@@ -173,12 +173,52 @@ html:has(.search-lock) body {
   transform: translate(-50%, -50%);
 }
 
-.indexed-line {
-  pointer-events: none;
+.search-market-line {
   position: absolute;
+  left: 0;
   right: 0;
   top: 100%;
   margin-top: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.stage-layer[data-results="true"] .search-market-line {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.65rem;
+}
+
+.market-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.market-picker select {
+  max-width: 190px;
+  min-height: 34px;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.market-picker select:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+.indexed-line {
+  pointer-events: none;
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -1177,7 +1217,7 @@ ol {
   html:has(.stage-layer[data-results="true"]) .answer-float {
     top: max(0.75rem, env(safe-area-inset-top));
     right: 12px;
-    bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    bottom: calc(8.6rem + env(safe-area-inset-bottom));
     left: 12px;
     display: flex;
     flex-direction: column;
@@ -1232,7 +1272,15 @@ ol {
   }
 
   .indexed-line {
-    font-size: 10px;
+    display: none;
+  }
+
+  .search-market-line {
+    justify-content: center;
+  }
+
+  .market-picker select {
+    min-height: 44px;
   }
 }
 

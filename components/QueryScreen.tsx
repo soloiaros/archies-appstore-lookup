@@ -55,6 +55,7 @@ import { useQuery } from "@/hooks/useQuery";
 import type { AppDetail as AppRecord } from "@/lib/catalog/detail";
 
 import { useRoute } from "@/hooks/useRoute";
+import { DEFAULT_MARKET, MARKETS, parseMarket, type MarketCode } from "@/lib/markets";
 
 type PileIcon = {
   id: string;
@@ -99,7 +100,11 @@ export function QueryScreen({
 
   const [text, setText] = useState("");
 
-  const { state, run } = useQuery();
+  const [market, setMarket] = useState<MarketCode>(DEFAULT_MARKET);
+  const marketRef = useRef(market);
+  marketRef.current = market;
+
+  const { state, run, reset: resetQuery } = useQuery();
 
   const floor = useRef<FloorApi | null>(null);
 
@@ -122,6 +127,23 @@ export function QueryScreen({
   const ready = useRef(
     new Map<number, AppRecord>(),
   );
+
+  useEffect(() => {
+    try {
+      const saved = parseMarket(window.localStorage.getItem("10k-market"));
+      if (saved) setMarket(saved);
+    } catch {
+      // The default market works when storage is unavailable.
+    }
+  }, []);
+
+  useEffect(() => {
+    resetQuery();
+    ready.current.clear();
+    setDetail(null);
+    floor.current?.release();
+    floor.current?.ghost(null);
+  }, [market, resetQuery]);
 
   const [, startTransition] = useTransition();
 
@@ -155,6 +177,7 @@ export function QueryScreen({
   const matches = useMemo(() => {
     if (
       state.phase !== "done"
+      || state.market !== market
       || state.answer.shape !== "discovery"
       || (
         state.answer.scoring !== "scored"
@@ -172,7 +195,7 @@ export function QueryScreen({
       detail: undefined as string | undefined,
       trackId: hit.trackId,
     }));
-  }, [state]);
+  }, [state, market]);
 
   useEffect(() => {
     if (!matches.length) {
@@ -202,6 +225,7 @@ export function QueryScreen({
       if (
         (
           state.phase === "done"
+          && state.market === market
           && (
             (
               state.answer.shape === "discovery"
@@ -220,14 +244,15 @@ export function QueryScreen({
         || (
           state.phase === "loading"
           && state.query === query
+          && state.market === market
         )
       ) {
         return;
       }
 
-      void run(query);
+      void run(query, market);
     },
-    [state, run],
+    [state, run, market],
   );
 
   const lastKey = useRef(0);
@@ -273,16 +298,14 @@ export function QueryScreen({
       const cached = ready.current.get(trackId);
 
       if (cached) {
-        return cached;
+        return { ...cached, matchProbability: probability };
       }
 
-      const query =
-        probability === null
-          ? ""
-          : `?p=${probability}`;
+      const query = new URLSearchParams({ market });
+      if (probability !== null) query.set("p", String(probability));
 
       const response = await fetch(
-        `/api/app/${trackId}${query}`,
+        `/api/app/${trackId}?${query.toString()}`,
       );
 
       if (!response.ok) {
@@ -292,6 +315,8 @@ export function QueryScreen({
       const data = await response.json() as AppRecord;
 
       if (
+        marketRef.current !== market
+        ||
         !data
         || data.trackId !== trackId
       ) {
@@ -302,7 +327,7 @@ export function QueryScreen({
 
       return data;
     },
-    [],
+    [market],
   );
 
   const showDetail = useCallback(
@@ -393,7 +418,7 @@ export function QueryScreen({
       trackId: number;
 
       probability: number | null;
-    }[] = matches.map((match) => ({
+    }[] = matches.slice(0, 3).map((match) => ({
       trackId: match.trackId,
       probability: match.probability,
     }));
@@ -468,6 +493,7 @@ export function QueryScreen({
 
   const answerShown =
     state.phase === "done"
+    && state.market === market
     && (
       (route === "factual" && state.answer.shape === "factual")
       || (route === "comparative" && state.answer.shape === "comparative")
@@ -475,6 +501,7 @@ export function QueryScreen({
 
   const discoveryShown =
     state.phase === "done"
+    && state.market === market
     && state.answer.shape === "discovery"
     && matches.length > 0
     && text.trim() === state.answer.query;
@@ -573,6 +600,7 @@ export function QueryScreen({
                   onChange={onType}
                   onSubmit={submit}
                   onClear={() => {
+                    resetQuery();
                     reset();
                     setText("");
                     setDetail(null);
@@ -582,13 +610,37 @@ export function QueryScreen({
                   clearable={outputShown}
                 />
 
+                <div className="search-market-line">
+                  <label className="market-picker">
+                    <span>Market</span>
+                    <select
+                      aria-label="App Store market"
+                      value={market}
+                      onChange={(event) => {
+                        const next = parseMarket(event.target.value);
+                        if (!next) return;
+                        resetQuery();
+                        setMarket(next);
+                        try {
+                          window.localStorage.setItem("10k-market", next);
+                        } catch {
+                          // Selection still applies for this visit.
+                        }
+                      }}
+                    >
+                      {MARKETS.map((item) => (
+                        <option key={item.code} value={item.code}>{item.name}</option>
+                      ))}
+                    </select>
+                  </label>
                 <div className="indexed-line">
                   <StoreMark size={13} />
                   <span>
                     {indexed.toLocaleString()}
                     {" "}
-                    apps indexed
+                    apps in the index
                   </span>
+                </div>
                 </div>
 
                 {discoveryTier
@@ -617,7 +669,7 @@ export function QueryScreen({
                   type="button"
                   aria-label="Try again"
                   onClick={() => {
-                    void run(notice.retry!);
+                    void run(notice.retry!, market);
                   }}
                 >
                   ↻
@@ -626,9 +678,10 @@ export function QueryScreen({
             </NoticeSurface>
           ) : null}
 
-          <AccountPromo armed={state.phase === "done"} />
+          <AccountPromo armed={state.phase === "done" && state.market === market} />
 
           {state.phase === "done"
+          && state.market === market
           && route === "factual"
           && state.answer.shape === "factual" ? (
             <OutputShell>
@@ -644,6 +697,7 @@ export function QueryScreen({
           ) : null}
 
           {state.phase === "done"
+          && state.market === market
           && route === "comparative"
           && state.answer.shape === "comparative" ? (
             <OutputShell>

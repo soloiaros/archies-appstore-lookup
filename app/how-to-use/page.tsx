@@ -20,7 +20,7 @@ const ASKS = [
 const PIPE = [
   {
     title: "Index",
-    body: "US App Store charts from Apple's feeds, refreshed daily.",
+    body: "Top charts from ten App Store markets, refreshed weekly from Apple's feeds.",
   },
   {
     title: "Route",
@@ -76,6 +76,8 @@ export default function HowToUsePage() {
           aria-labelledby="ask-title"
         >
           <h2 id="ask-title">Ask</h2>
+
+          <p>Choose a market before searching. Descriptions work best in English; app names can use their local script.</p>
 
           <ul className="ask-list">
             {ASKS.map((ask) => (
