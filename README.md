@@ -113,6 +113,14 @@ The job stops before one million rows written in a run or one gigabyte of catalo
 
 `npm run poll:momentum` remains useful for local experiments. It updates only `data/catalog.sqlite` and is not a production updater; remove any installed local crontab entry once the D1 workflow is active. Weekly snapshots provide week-to-week momentum rather than daily momentum.
 
+### Market selection
+
+Search defaults to the US and remembers the selected market on the device. The API accepts only the ten codes in `lib/markets.ts`. `market_apps` records where an app has appeared in the weekly charts; `market_metadata` holds localized names, descriptions, prices, links, and ratings. Global app vectors are shared across markets, so the same app is embedded once. The first release adds the three overall charts per non-US market; it does not multiply the US genre feed collection by ten.
+
+The existing ranking Durable Object keeps country membership and localized search fields in memory and in its persisted cache. It filters before vector scoring and candidate selection, then hydrates only those IDs. Warm searches add no D1 membership query and no extra AI call. Fallback retrieval, factual answers, comparisons, and app details use the same market boundary. Revenue from one country is never substituted for missing revenue in another. Descriptive search retains the English BGE model; local-script app names are supported, while multilingual semantic search needs a separate model evaluation.
+
+The added nine markets produced about 2,500 distinct market memberships in a feed sample. Their weekly ingestion stays on the public GitHub runner and within the existing D1 write and storage guards. Row usage increases, but the expected volume is far below the paid plan's included allowance; account-wide usage still determines the bill.
+
 ## Checks
 
 ```bash

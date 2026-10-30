@@ -18,6 +18,7 @@ import type { AppDetail } from "@/lib/catalog/detail";
 import { vectorFinalists } from "@/lib/catalog/vectors";
 
 import type { SiteSql } from "@/lib/site/types";
+import type { MarketCode } from "@/lib/markets";
 
 import type { AppMetadata } from "@/models/app";
 
@@ -37,28 +38,28 @@ import type {
 
 import type { ScoredFinalist } from "@/lib/jev/score";
 
-const APP_COLUMNS = `
-  track_id as trackId,
-  bundle_id as bundleId,
-  name,
-  description,
-  seller_name as sellerName,
-  icon_url as iconUrl,
-  screenshot_urls as screenshotUrls,
-  primary_genre_id as primaryGenreId,
-  primary_genre as primaryGenre,
-  genre_ids as genreIds,
-  genres,
-  price,
-  currency,
-  formatted_price as formattedPrice,
-  store_url as storeUrl,
-  version,
-  release_date as releaseDate,
-  current_version_release_date as currentVersionReleaseDate,
-  content_advisory_rating as contentAdvisoryRating,
-  metadata_fetched_at as metadataFetchedAt,
-  delisted
+const MARKET_APP_COLUMNS = `
+  a.track_id as trackId,
+  a.bundle_id as bundleId,
+  coalesce(m.name, a.name) as name,
+  coalesce(m.description, a.description) as description,
+  a.seller_name as sellerName,
+  coalesce(m.icon_url, a.icon_url) as iconUrl,
+  a.screenshot_urls as screenshotUrls,
+  a.primary_genre_id as primaryGenreId,
+  a.primary_genre as primaryGenre,
+  a.genre_ids as genreIds,
+  a.genres,
+  a.price,
+  coalesce(m.currency, a.currency) as currency,
+  coalesce(m.formatted_price, a.formatted_price) as formattedPrice,
+  coalesce(m.store_url, a.store_url) as storeUrl,
+  a.version,
+  a.release_date as releaseDate,
+  a.current_version_release_date as currentVersionReleaseDate,
+  a.content_advisory_rating as contentAdvisoryRating,
+  coalesce(m.metadata_fetched_at, a.metadata_fetched_at) as metadataFetchedAt,
+  case when ma.country = 'us' then a.delisted else 0 end as delisted
 `;
 
 type AppRow = {
@@ -148,12 +149,12 @@ function toApp(row: AppRow): AppMetadata {
 function tokens(query: string) {
   return query
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
+    .split(/[^\p{L}\p{N}]+/u)
     .map((token) => token.replace(/[%_]/g, ""))
     .filter((token) => token.length >= 2);
 }
 
-export function cloudCatalog(sql: SiteSql): Catalog & {
+export function cloudCatalog(sql: SiteSql, market: MarketCode): Catalog & {
   close(): void;
 } {
   return {
@@ -168,13 +169,15 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
 
       const exact = await sql.get<AppRow>(
         `
-        select ${APP_COLUMNS}
-        from apps
-        where delisted = 0
-          and lower(name) = ?
+        select ${MARKET_APP_COLUMNS}
+        from apps a
+        join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+        left join market_metadata m on m.track_id = a.track_id and m.country = ?
+        where (a.delisted = 0 or ma.country <> 'us')
+          and lower(coalesce(m.name, a.name)) = ?
         limit 1
         `,
-        [wanted],
+        [market, market, wanted],
       );
 
       if (exact) {
@@ -183,20 +186,43 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
 
       const loose = await sql.get<AppRow>(
         `
-        select ${APP_COLUMNS}
-        from apps
-        where delisted = 0
-          and lower(name) like ?
-        order by length(name)
+        select ${MARKET_APP_COLUMNS}
+        from apps a
+        join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+        left join market_metadata m on m.track_id = a.track_id and m.country = ?
+        where (a.delisted = 0 or ma.country <> 'us')
+          and lower(coalesce(m.name, a.name)) like ?
+        order by length(coalesce(m.name, a.name))
         limit 1
         `,
-        [`%${wanted.replace(/[%_]/g, "")}%`],
+        [market, market, `%${wanted.replace(/[%_]/g, "")}%`],
       );
 
       return loose ? toApp(loose) : null;
     },
 
     async ratings(trackId) {
+      if (market !== "us") {
+        const row = await sql.get<{
+          capturedAt: string;
+          ratingAverage: number | null;
+          ratingCount: number | null;
+        }>(`
+          select metadata_fetched_at as capturedAt,
+            rating_average as ratingAverage, rating_count as ratingCount
+          from market_metadata
+          where country = ? and track_id = ?
+        `, [market, trackId]);
+        return row?.ratingAverage == null || row.ratingCount == null ? [] : [{
+          tier: "verified",
+          origin: "lookup",
+          trackId,
+          capturedAt: String(row.capturedAt),
+          ratingAverage: Number(row.ratingAverage),
+          ratingCount: Number(row.ratingCount),
+        }];
+      }
+
       const rows = await sql.all<{
         trackId: number;
         capturedAt: string;
@@ -244,10 +270,10 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
           genre_id as genreId,
           rank
         from chart_snapshots
-        where track_id = ?
+        where track_id = ? and country = ?
         order by captured_at
         `,
-        [trackId],
+        [trackId, market],
       );
 
       return rows.map((row): ChartSnapshot => ({
@@ -263,24 +289,27 @@ export function cloudCatalog(sql: SiteSql): Catalog & {
     },
 
     async finalists(query) {
-      const ranked = await vectorFinalists(sql, query);
+      const ranked = await vectorFinalists(sql, query, market);
 
       if (ranked) {
         return ranked;
       }
 
-      return lexicalFinalists(sql, query);
+      return lexicalFinalists(sql, query, market);
     },
 
     async ranked() {
       const rows = await sql.all<AppRow>(
         `
-        select ${APP_COLUMNS}
-        from apps
-        where delisted = 0
-        order by name
+        select ${MARKET_APP_COLUMNS}
+        from apps a
+        join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+        left join market_metadata m on m.track_id = a.track_id and m.country = ?
+        where (a.delisted = 0 or ma.country <> 'us')
+        order by coalesce(m.name, a.name)
         limit 200
         `,
+        [market, market],
       );
 
       return rows.map((row) => ({
@@ -354,44 +383,32 @@ export async function loadCloudDetail(
   sql: SiteSql,
   trackId: number,
   matchProbability: number | null,
+  market: MarketCode,
 ): Promise<AppDetail | null> {
   const row = await sql.get<AppRow & { tier: ProvenanceTier }>(
     `
-    select ${APP_COLUMNS}, tier
-    from apps
-    where track_id = ?
+    select ${MARKET_APP_COLUMNS}, a.tier
+    from apps a
+    join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+    left join market_metadata m on m.track_id = a.track_id and m.country = ?
+    where a.track_id = ?
     limit 1
     `,
-    [trackId],
+    [market, market, trackId],
   );
 
   if (!row) {
     return null;
   }
 
-  const rating = await sql.get<{
-    average: number;
-    count: number;
-    tier: ProvenanceTier;
-  }>(
-    `
-    select
-      rating_average as average,
-      rating_count as count,
-      tier
-    from rating_snapshots
-    where track_id = ?
-    order by captured_at desc
-    limit 1
-    `,
-    [trackId],
-  );
+  const catalog = cloudCatalog(sql, market);
 
-  const catalog = cloudCatalog(sql);
+  const ratings = await catalog.ratings(trackId);
+  const rating = ratings.at(-1);
 
   const charts = await catalog.charts(trackId);
 
-  const revenue = await latestRevenue(sql, trackId);
+  const revenue = await latestRevenue(sql, trackId, market);
 
   const tags = await detailTags(sql, trackId);
 
@@ -424,8 +441,8 @@ export async function loadCloudDetail(
     delisted: row.delisted === 1,
     tags,
     rating: {
-      average: rating?.average ?? null,
-      count: rating?.count ?? null,
+      average: rating?.ratingAverage ?? null,
+      count: rating?.ratingCount ?? null,
       tier: rating?.tier ?? "unavailable",
     },
     momentum: momentumFromCharts(charts),
@@ -448,6 +465,7 @@ const REVENUE_BASES = new Set<RevenueBasis>([
 async function lexicalFinalists(
   sql: SiteSql,
   query: string,
+  market: MarketCode,
 ): Promise<Finalist[]> {
   const words = tokens(query);
 
@@ -456,7 +474,7 @@ async function lexicalFinalists(
   }
 
   const where = words
-    .map(() => "(lower(name) like ? or lower(description) like ?)")
+    .map(() => "(lower(coalesce(m.name, a.name)) like ? or lower(coalesce(m.description, a.description)) like ?)")
     .join(" and ");
 
   const params = words.flatMap((word) => [`%${word}%`, `%${word}%`]);
@@ -469,17 +487,19 @@ async function lexicalFinalists(
   }>(
     `
     select
-      track_id as trackId,
-      name,
-      description,
-      icon_url as iconUrl
-    from apps
-    where delisted = 0
+        a.track_id as trackId,
+        coalesce(m.name, a.name) as name,
+        coalesce(m.description, a.description) as description,
+        coalesce(m.icon_url, a.icon_url) as iconUrl
+    from apps a
+    join market_apps ma on ma.track_id = a.track_id and ma.country = ?
+    left join market_metadata m on m.track_id = a.track_id and m.country = ?
+    where (a.delisted = 0 or ma.country <> 'us')
       and ${where}
-    order by length(name)
+    order by length(coalesce(m.name, a.name))
     limit 40
     `,
-    params,
+    [market, market, ...params],
   );
 
   return rows.map((row): Finalist => ({
@@ -494,6 +514,7 @@ async function lexicalFinalists(
 async function latestRevenue(
   sql: SiteSql,
   trackId: number,
+  market: MarketCode,
 ) {
   try {
     const row = await sql.get<{
@@ -515,11 +536,11 @@ async function latestRevenue(
         high_usd as highUsd,
         method
       from revenue_estimates
-      where track_id = ?
+      where track_id = ? and country = ?
       order by captured_on desc
       limit 1
       `,
-      [trackId],
+      [trackId, market],
     );
 
     const basis = String(row?.basis ?? "");

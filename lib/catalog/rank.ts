@@ -67,17 +67,20 @@ function fieldsOf(app: CatalogApp): SearchFields {
 }
 
 export type PackedVectors = {
-  ids: Int32Array;
+  ids: Float64Array;
 
-  data: Float32Array;
+  data: Int8Array;
+
+  scales: Float32Array;
 
   dims: number;
 };
 
 export function emptyPacked(dims: number): PackedVectors {
   return {
-    ids: new Int32Array(),
-    data: new Float32Array(),
+    ids: new Float64Array(),
+    data: new Int8Array(),
+    scales: new Float32Array(),
     dims,
   };
 }
@@ -90,9 +93,10 @@ export function packVectors(
     (left, right) => left.trackId - right.trackId,
   );
 
-  const ids = new Int32Array(sorted.length);
+  const ids = new Float64Array(sorted.length);
 
-  const data = new Float32Array(sorted.length * dims);
+  const data = new Int8Array(sorted.length * dims);
+  const scales = new Float32Array(sorted.length);
 
   let count = 0;
 
@@ -103,7 +107,13 @@ export function packVectors(
 
     ids[count] = row.trackId;
 
-    data.set(row.vector, count * dims);
+    let largest = 0;
+    for (const value of row.vector) largest = Math.max(largest, Math.abs(value));
+    const scale = largest > 0 ? largest / 127 : 1;
+    scales[count] = scale;
+    for (let index = 0; index < dims; index += 1) {
+      data[count * dims + index] = Math.round(row.vector[index]! / scale);
+    }
 
     count += 1;
   }
@@ -111,6 +121,7 @@ export function packVectors(
   return {
     ids: ids.subarray(0, count),
     data: data.subarray(0, count * dims),
+    scales: scales.subarray(0, count),
     dims,
   };
 }
@@ -122,7 +133,9 @@ export function nominateIds(
   text: PackedVectors,
   looking: Float32Array | null,
   icons: PackedVectors,
+  allowed: ReadonlySet<number> | null = null,
 ): number[] {
+  if (allowed && allowed.size === 0) return [];
   const nominated = new Map<number, number>();
 
   const bump = (trackId: number, score: number) => {
@@ -132,7 +145,7 @@ export function nominateIds(
     );
   };
 
-  for (const hit of topDot(asking, text, BY_MEANING)) {
+  for (const hit of topDot(asking, text, BY_MEANING, allowed)) {
     bump(hit.trackId, hit.score);
   }
 
@@ -141,25 +154,25 @@ export function nominateIds(
     && looking.length === ICON_DIMS
     && icons.ids.length > 0
   ) {
-    for (const hit of topDot(looking, icons, BY_LOOKS)) {
+    for (const hit of topDot(looking, icons, BY_LOOKS, allowed)) {
       bump(hit.trackId, 0.5 + hit.score);
     }
   }
 
-  for (const hit of tagOverlap(query, apps).slice(0, BY_TAGS)) {
+  for (const hit of tagOverlap(query, apps, allowed).slice(0, BY_TAGS)) {
     bump(hit.trackId, 0.4 + hit.score);
   }
 
-  for (const hit of lexicalHits(query, apps).slice(0, BY_LEXICAL)) {
+  for (const hit of lexicalHits(query, apps, allowed).slice(0, BY_LEXICAL)) {
     bump(hit.trackId, 0.3 + hit.score);
   }
 
-  for (const trackId of nameHits(query, apps).slice(0, BY_NAME)) {
+  for (const trackId of nameHits(query, apps, allowed).slice(0, BY_NAME)) {
     bump(trackId, 0.95);
   }
 
   if (queryMentionsLetters(query)) {
-    for (const trackId of letterHits(query, apps)) {
+    for (const trackId of letterHits(query, apps, allowed)) {
       bump(trackId, 0.9);
     }
   }
@@ -216,6 +229,7 @@ function topDot(
   query: Float32Array,
   packed: PackedVectors,
   limit: number,
+  allowed: ReadonlySet<number> | null,
 ): Array<{ trackId: number; score: number }> {
   if (query.length !== packed.dims || packed.ids.length === 0) {
     return [];
@@ -226,6 +240,7 @@ function topDot(
   const dims = packed.dims;
 
   for (let row = 0; row < packed.ids.length; row += 1) {
+    if (allowed && !allowed.has(packed.ids[row]!)) continue;
     let sum = 0;
 
     const offset = row * dims;
@@ -233,6 +248,7 @@ function topDot(
     for (let index = 0; index < dims; index += 1) {
       sum += query[index]! * packed.data[offset + index]!;
     }
+    sum *= packed.scales[row]!;
 
     hits.push({
       trackId: packed.ids[row]!,
@@ -252,7 +268,7 @@ function wordsOf(query: string, min: number): string[] {
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]+/g, " ")
+    .replace(/[^\p{L}\p{N}\s-]+/gu, " ")
     .split(/[\s-]+/)
     .filter(Boolean);
 }
@@ -260,8 +276,9 @@ function tokenize(text: string): string[] {
 function nameHits(
   query: string,
   apps: CatalogApp[],
+  allowed: ReadonlySet<number> | null,
 ): number[] {
-  const words = wordsOf(query, 4);
+  const words = wordsOf(query, /[^\x00-\x7f]/.test(query) ? 2 : 4);
 
   if (words.length === 0) {
     return [];
@@ -269,6 +286,7 @@ function nameHits(
 
   return apps
     .filter((app) => {
+      if (allowed && !allowed.has(app.trackId)) return false;
       const name = fieldsOf(app).name;
       return words.some((word) => name.includes(word));
     })
@@ -278,6 +296,7 @@ function nameHits(
 function lexicalHits(
   query: string,
   apps: CatalogApp[],
+  allowed: ReadonlySet<number> | null,
 ): Array<{ trackId: number; score: number }> {
   const words = wordsOf(query, 3);
 
@@ -286,6 +305,7 @@ function lexicalHits(
   }
 
   return apps
+    .filter((app) => !allowed || allowed.has(app.trackId))
     .map((app) => {
       const hay = fieldsOf(app).words;
 
@@ -309,6 +329,7 @@ function lexicalHits(
 function letterHits(
   query: string,
   apps: CatalogApp[],
+  allowed: ReadonlySet<number> | null,
 ): number[] {
   const words = tokenize(query).filter(
     (word) => word.length >= 3 && !LETTER_WORDS.has(word),
@@ -320,6 +341,7 @@ function letterHits(
 
   return apps
     .filter((app) => {
+      if (allowed && !allowed.has(app.trackId)) return false;
       const letters = fieldsOf(app).letters;
 
       return (
@@ -333,6 +355,7 @@ function letterHits(
 function tagOverlap(
   query: string,
   apps: CatalogApp[],
+  allowed: ReadonlySet<number> | null,
 ): Array<{ trackId: number; score: number }> {
   const words = tokenize(query);
 
@@ -357,6 +380,7 @@ function tagOverlap(
   const scores: Array<{ trackId: number; score: number }> = [];
 
   for (const app of apps) {
+    if (allowed && !allowed.has(app.trackId)) continue;
     let hits = 0;
 
     for (const tag of app.tags) {

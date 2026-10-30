@@ -89,9 +89,8 @@ export default async function HomePage() {
               </h2>
 
               <p className="home-howto-lede">
-                Open Search and type what you want. The
-                index is the US App Store charts, and a
-                sentence is enough.
+                Open Search, choose an App Store market,
+                and type what you want. A sentence is enough.
               </p>
             </div>
 

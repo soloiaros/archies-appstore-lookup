@@ -1,4 +1,5 @@
 import type { D1Database } from "../site/d1";
+import { DEFAULT_MARKET, MARKETS, parseMarket, type MarketCode } from "../markets";
 
 import {
   ICON_DIMS,
@@ -24,6 +25,7 @@ const ICON_PAGE = 120;
 const APP_PAGE = 500;
 
 const REVISION_CHECK_MS = 5 * 60 * 1000;
+const CACHE_FORMAT = "market-safe-ids-q8-1";
 
 type SqlRow = Record<string, unknown>;
 
@@ -57,6 +59,10 @@ type Memory = {
   icons: PackedVectors;
 
   apps: CatalogApp[];
+
+  markets: Map<MarketCode, Set<number>>;
+
+  localized: Map<MarketCode, CatalogApp[]>;
 };
 
 type VectorRow = {
@@ -116,6 +122,8 @@ export class CatalogRank {
       text?: string;
 
       icon?: string | null;
+
+      market?: unknown;
     };
 
     if (!body.query || !body.text) {
@@ -123,6 +131,11 @@ export class CatalogRank {
         { ok: false },
         { status: 400 },
       );
+    }
+
+    const market = parseMarket(body.market ?? DEFAULT_MARKET);
+    if (!market) {
+      return Response.json({ ok: false }, { status: 400 });
     }
 
     const asking = decodeVector(body.text, TEXT_DIMS * 4);
@@ -140,11 +153,12 @@ export class CatalogRank {
 
     const ids = nominateIds(
       body.query,
-      this.memory.apps,
+      this.memory.localized.get(market) ?? this.memory.apps,
       asking,
       this.memory.text,
       looking,
       this.memory.icons,
+      this.memory.markets.get(market) ?? new Set<number>(),
     );
 
     return Response.json({
@@ -261,7 +275,6 @@ export class CatalogRank {
         `
         select count(*) as n
         from apps
-        where delisted = 0
         `,
       ),
       this.count(
@@ -325,21 +338,24 @@ export class CatalogRank {
   }
 
   private async fill(stamp: string): Promise<Memory> {
-    const textRows = await this.loadVectors(
+    const text = packVectors(await this.loadVectors(
       "text_embeddings",
       TEXT_MODEL,
       TEXT_DIMS,
       TEXT_PAGE,
-    );
+    ), TEXT_DIMS);
 
-    const iconRows = await this.loadVectors(
+    const icons = packVectors(await this.loadVectors(
       "icon_embeddings",
       ICON_MODEL,
       ICON_DIMS,
       ICON_PAGE,
-    );
+    ), ICON_DIMS);
 
     const apps = prepareCatalogApps(await this.loadApps());
+
+    const markets = await this.loadMarkets();
+    const localized = await this.loadLocalizedApps(apps);
 
     const expectedTags = Number(stamp.split(":")[3] ?? 0);
 
@@ -353,9 +369,11 @@ export class CatalogRank {
     }
 
     const memory = {
-      text: packVectors(textRows, TEXT_DIMS),
-      icons: packVectors(iconRows, ICON_DIMS),
+      text,
+      icons,
       apps,
+      markets,
+      localized,
     };
 
     if (!this.matches(memory, stamp)) {
@@ -484,6 +502,64 @@ export class CatalogRank {
     return apps;
   }
 
+  private async loadMarkets(): Promise<Map<MarketCode, Set<number>>> {
+    const db = this.env.CATALOG_DB;
+    const markets = new Map<MarketCode, Set<number>>();
+    if (!db) return markets;
+
+    await Promise.all(MARKETS.map(async ({ code }) => {
+      const ids = new Set<number>();
+      let after = 0;
+      for (;;) {
+        const rows = await d1All<{ trackId: number }>(db, `
+          select m.track_id as trackId
+          from market_apps m join apps a on a.track_id = m.track_id
+          where m.country = ? and m.track_id > ?
+            and (m.country <> 'us' or a.delisted = 0)
+          order by m.track_id
+          limit ${APP_PAGE}
+        `, [code, after]);
+        for (const row of rows) {
+          const id = Number(row.trackId);
+          if (Number.isSafeInteger(id) && id > 0) ids.add(id);
+          after = id;
+        }
+        if (rows.length < APP_PAGE) break;
+      }
+      markets.set(code, ids);
+    }));
+
+    return markets;
+  }
+
+  private async loadLocalizedApps(apps: CatalogApp[]): Promise<Map<MarketCode, CatalogApp[]>> {
+    const db = this.env.CATALOG_DB;
+    const localized = new Map<MarketCode, CatalogApp[]>();
+    if (!db) return localized;
+    const byId = new Map(apps.map((app) => [app.trackId, app]));
+    await Promise.all(MARKETS.filter((market) => market.code !== DEFAULT_MARKET).map(async ({ code }) => {
+      const list: CatalogApp[] = [];
+      let after = 0;
+      for (;;) {
+        const rows = await d1All<{ trackId: number; name: string; blurb: string }>(db, `
+          select track_id as trackId, name, substr(description, 1, 800) as blurb
+          from market_metadata
+          where country = ? and track_id > ?
+          order by track_id limit ${APP_PAGE}
+        `, [code, after]);
+        for (const row of rows) {
+          const id = Number(row.trackId);
+          const shared = byId.get(id);
+          if (shared) list.push({ ...shared, name: String(row.name), blurb: String(row.blurb) });
+          after = id;
+        }
+        if (rows.length < APP_PAGE) break;
+      }
+      localized.set(code, prepareCatalogApps(list));
+    }));
+    return localized;
+  }
+
   private async appShard(
     db: D1Database,
     shard: number,
@@ -507,8 +583,7 @@ export class CatalogRank {
           name,
           substr(description, 1, 800) as blurb
         from apps
-        where delisted = 0
-          and track_id > ?
+        where track_id > ?
           and (track_id % ${SHARDS}) = ?
         order by track_id
         limit ${APP_PAGE}
@@ -663,6 +738,8 @@ export class CatalogRank {
 
       this.run("delete from app_row");
 
+      this.run("delete from market_app_row");
+
       this.run("delete from meta");
     });
 
@@ -671,8 +748,26 @@ export class CatalogRank {
     this.writeVectors("icon_vec", memory.icons);
 
     this.writeApps(memory.apps);
+    for (const [market, apps] of memory.localized) {
+      for (let index = 0; index < apps.length; index += 200) {
+        this.state.storage.transactionSync(() => {
+          for (const app of apps.slice(index, index + 200)) {
+            this.run("insert into market_app_row (country, track_id, name, blurb, letters, tags) values (?, ?, ?, ?, ?, ?)",
+              market, app.trackId, app.name, app.blurb, app.letters, JSON.stringify(app.tags));
+          }
+        });
+      }
+    }
 
     this.state.storage.transactionSync(() => {
+      this.run("insert into meta (key, value) values ('format', ?)", CACHE_FORMAT);
+      for (const [market, ids] of memory.markets) {
+        this.run(
+          "insert into meta (key, value) values (?, ?)",
+          `market:${market}`,
+          JSON.stringify([...ids]),
+        );
+      }
       this.run(
         `
         insert into meta (key, value)
@@ -689,10 +784,10 @@ export class CatalogRank {
     for (let index = 0; index < packed.ids.length; index += 1) {
       const offset = index * packed.dims;
 
-      const vector = packed.data.subarray(
-        offset,
-        offset + packed.dims,
-      );
+      const vector = new Float32Array(packed.dims);
+      for (let at = 0; at < packed.dims; at += 1) {
+        vector[at] = packed.data[offset + at]! * packed.scales[index]!;
+      }
 
       const bytes = new Uint8Array(vector.byteLength);
 
@@ -764,17 +859,23 @@ export class CatalogRank {
 
   private readMemory(): Memory | null {
     try {
+      if (this.run("select value from meta where key = 'format'")[0]?.value !== CACHE_FORMAT) {
+        return null;
+      }
       const text = this.readPacked("text_vec", TEXT_DIMS);
 
       const icons = this.readPacked("icon_vec", ICON_DIMS);
 
       const apps = prepareCatalogApps(this.readApps());
 
-      if (text.ids.length === 0) {
+      const markets = this.readMarkets();
+      const localized = this.readLocalizedApps();
+
+      if (text.ids.length === 0 || !markets.has(DEFAULT_MARKET)) {
         return null;
       }
 
-      return { text, icons, apps };
+      return { text, icons, apps, markets, localized };
     } catch {
       return null;
     }
@@ -826,6 +927,35 @@ export class CatalogRank {
     }));
   }
 
+  private readMarkets(): Map<MarketCode, Set<number>> {
+    const markets = new Map<MarketCode, Set<number>>();
+    const rows = this.run("select key, value from meta where key like 'market:%'");
+    for (const row of rows) {
+      const market = parseMarket(String(row.key).slice(7));
+      if (!market) continue;
+      const ids = JSON.parse(String(row.value)) as unknown;
+      if (!Array.isArray(ids)) throw new Error("catalog market cache");
+      markets.set(market, new Set(ids.filter((id): id is number =>
+        Number.isSafeInteger(id) && Number(id) > 0)));
+    }
+    return markets;
+  }
+
+  private readLocalizedApps(): Map<MarketCode, CatalogApp[]> {
+    const localized = new Map<MarketCode, CatalogApp[]>();
+    const rows = this.run("select country, track_id, name, blurb, letters, tags from market_app_row order by country, track_id");
+    for (const row of rows) {
+      const market = parseMarket(row.country);
+      if (!market) continue;
+      const list = localized.get(market) ?? [];
+      list.push({ trackId: Number(row.track_id), name: String(row.name), blurb: String(row.blurb),
+        letters: String(row.letters), tags: parseTags(row.tags) });
+      localized.set(market, list);
+    }
+    for (const apps of localized.values()) prepareCatalogApps(apps);
+    return localized;
+  }
+
   private savedStamp(): string | null {
     const rows = this.run(
       `
@@ -871,6 +1001,18 @@ export class CatalogRank {
         blurb text not null,
         letters text not null,
         tags text not null
+      )
+    `);
+
+    this.run(`
+      create table if not exists market_app_row (
+        country text not null,
+        track_id integer not null,
+        name text not null,
+        blurb text not null,
+        letters text not null,
+        tags text not null,
+        primary key (country, track_id)
       )
     `);
   }

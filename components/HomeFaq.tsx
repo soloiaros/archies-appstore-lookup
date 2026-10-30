@@ -5,7 +5,7 @@ import { useState } from "react";
 const ITEMS = [
   {
     q: "What is 10K?",
-    a: "A lookup for the US App Store. Describe an app, name one, or compare a few. The answer comes from the charts, and every field carries a provenance mark.",
+    a: "A lookup across ten App Store markets. Choose a market, describe an app, name one, or compare a few. The answer comes from the charts, and every field carries a provenance mark.",
   },
   {
     q: "What can I ask?",
@@ -17,11 +17,11 @@ const ITEMS = [
   },
   {
     q: "Where does the catalog come from?",
-    a: "US top charts, through Apple’s public feeds and the iTunes Lookup API. The site does not scrape App Store web pages. Downloads and monthly users stay empty unless a method is stored with the number.",
+    a: "Top charts in the US, Canada, Brazil, the UK, Germany, France, Spain, Japan, South Korea, and India, refreshed weekly through Apple’s public feeds and Lookup API. Downloads and monthly users stay empty unless a method is stored with the number.",
   },
   {
     q: "What do I need for a search?",
-    a: "Search runs against the index on this machine. Scoring a description needs an OpenRouter key on the server. Without it, a description still retrieves finalists, and no percentage is invented.",
+    a: "Choose a market and enter a description in English, or an app name in its local script. The US is selected by default, and your last market choice is remembered on this device.",
   },
 ] as const;
 
