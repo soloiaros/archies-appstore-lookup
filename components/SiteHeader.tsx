@@ -27,14 +27,7 @@ const NAV = [
   },
 ] as const;
 
-const SIDE = [
-  {
-    href: "/support",
-    label: "Support",
-  },
-] as const;
-
-const MENU = [...NAV, ...SIDE] as const;
+const MENU = NAV;
 
 function isCurrent(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -250,22 +243,6 @@ export function SiteHeader() {
           </div>
 
           <div className="site-header-end">
-            <nav
-              className="site-nav"
-              aria-label="Site"
-            >
-              {SIDE.map((item) => (
-                <Key
-                  key={item.href}
-                  href={item.href}
-                  current={isCurrent(pathname, item.href)}
-                  onClick={() => playButtonSound()}
-                >
-                  {item.label}
-                </Key>
-              ))}
-            </nav>
-
             <a
               className="ui-key star-key"
               href={GITHUB_REPO}
