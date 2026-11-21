@@ -29,10 +29,6 @@ const NAV = [
 
 const SIDE = [
   {
-    href: "/stats",
-    label: "Stats",
-  },
-  {
     href: "/support",
     label: "Support",
   },
