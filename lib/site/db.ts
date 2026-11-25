@@ -78,7 +78,7 @@ export function useLocalSqlite() {
     return false;
   }
 
-  return process.env.NODE_ENV !== "production";
+  return true;
 }
 
 async function cloudflareEnv(): Promise<CfEnv | null> {
@@ -112,11 +112,11 @@ async function cloudflareEnv(): Promise<CfEnv | null> {
 export async function siteReader(): Promise<SiteSql | null> {
   const env = await cloudflareEnv();
 
-  if (!env?.SITE_DB) {
-    return null;
+  if (env?.SITE_DB) {
+    return fromD1(env.SITE_DB);
   }
 
-  return fromD1(env.SITE_DB);
+  return sqliteSite();
 }
 
 export async function siteDb(): Promise<SiteSql> {

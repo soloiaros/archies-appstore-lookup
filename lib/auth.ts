@@ -9,6 +9,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
 import { useLocalSqlite } from "@/lib/site/db";
+import { SCHEMA } from "@/lib/site/schema";
 
 function socialProviders() {
   const providers: {
@@ -55,6 +56,7 @@ function createAuth(database: DatabaseSync | D1DatabaseLike) {
   return betterAuth({
     database,
     appName: "10K",
+    secret: process.env.BETTER_AUTH_SECRET || "fallback_better_auth_secret_for_10k_appstore_indexor_32chars",
     socialProviders: socialProviders(),
     trustedOrigins: trustedOrigins(),
     account: {
@@ -83,6 +85,7 @@ function localDatabase() {
     mkdirSync(join(process.cwd(), "data"), { recursive: true });
     localDb = new DatabaseSync(join(process.cwd(), "data", "site.sqlite"));
     localDb.exec("pragma journal_mode = WAL");
+    localDb.exec(SCHEMA);
   }
 
   return localDb;

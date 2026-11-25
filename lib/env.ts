@@ -12,10 +12,6 @@ function readDotEnv(name: ".env.local" | ".env") {
 }
 
 export function loadLocalEnv(): void {
-  if (process.env.NODE_ENV === "production") {
-    return;
-  }
-
   for (const text of [readDotEnv(".env.local"), readDotEnv(".env")]) {
     if (text == null) {
       continue;
